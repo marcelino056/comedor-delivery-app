@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comedor & Delivery</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/style.css">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Comedor & Delivery">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>Comedor & Delivery</h1>
+            <p id="fecha-actual"></p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="ventas">
+                <span class="icon">🛒</span>
+                <span>Ventas</span>
+            </button>
+            <button class="tab-btn" data-tab="ordenes">
+                <span class="icon">📦</span>
+                <span>Delivery</span>
+            </button>
+            <button class="tab-btn" data-tab="caja">
+                <span class="icon">💰</span>
+                <span>Caja</span>
+            </button>
+        </nav>
+
+        <!-- Content -->
+        <main class="content">
+            <!-- Ventas Tab -->
+            <div id="ventas-tab" class="tab-content active">
+                <div class="tab-header">
+                    <h2>Ventas Locales</h2>
+                    <button class="btn-primary" onclick="openModal('venta')">
+                        <span class="icon">➕</span>
+                    </button>
+                </div>
+                <div id="ventas-list" class="items-list"></div>
+            </div>
+
+            <!-- Órdenes Tab -->
+            <div id="ordenes-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Delivery</h2>
+                    <button class="btn-primary" onclick="openModal('orden')">
+                        <span class="icon">➕</span>
+                    </button>
+                </div>
+                
+                <!-- Filtros -->
+                <div class="filters-grid">
+                    <button class="filter-btn active" data-filter="todos">
+                        <span class="filter-label">TODOS</span>
+                        <span class="filter-count" id="count-todos">0</span>
+                    </button>
+                    <button class="filter-btn filter-preparando" data-filter="preparando">
+                        <span class="filter-label">PREPARANDO</span>
+                        <span class="filter-count" id="count-preparando">0</span>
+                    </button>
+                    <button class="filter-btn filter-recibida" data-filter="recibida">
+                        <span class="filter-label">RECIBIDA</span>
+                        <span class="filter-count" id="count-recibida">0</span>
+                    </button>
+                    <button class="filter-btn filter-en-camino" data-filter="en-camino">
+                        <span class="filter-label">EN CAMINO</span>
+                        <span class="filter-count" id="count-en-camino">0</span>
+                    </button>
+                    <button class="filter-btn filter-entregada" data-filter="entregada">
+                        <span class="filter-label">ENTREGADA</span>
+                        <span class="filter-count" id="count-entregada">0</span>
+                    </button>
+                    <button class="filter-btn filter-anuladas" data-filter="anuladas">
+                        <span class="filter-label">ANULADAS</span>
+                        <span class="filter-count" id="count-anuladas">0</span>
+                    </button>
+                </div>
+
+                <div id="filter-info" class="filter-info hidden"></div>
+                <div id="ordenes-list" class="items-list"></div>
+            </div>
+
+            <!-- Caja Tab -->
+            <div id="caja-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Control de Caja</h2>
+                    <div class="header-buttons">
+                        <button id="btn-monto-inicial" class="btn-secondary hidden" onclick="openModal('montoInicial')">
+                            💰 Monto Inicial
+                        </button>
+                        <button class="btn-danger" onclick="openModal('gasto')">
+                            <span class="icon">➖</span>
+                            Agregar Gasto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Resumen -->
+                <div class="summary-grid">
+                    <div class="summary-card blue">
+                        <p class="summary-label">Monto Inicial</p>
+                        <p class="summary-value" id="monto-inicial-display">$0</p>
+                        <p class="summary-detail" id="monto-inicial-detail">Sin establecer</p>
+                    </div>
+                    <div class="summary-card green">
+                        <p class="summary-label">Ventas Totales</p>
+                        <p class="summary-value" id="ventas-totales">$0</p>
+                        <p class="summary-detail" id="transacciones-total">0 transacciones</p>
+                    </div>
+                    <div class="summary-card red">
+                        <p class="summary-label">Gastos</p>
+                        <p class="summary-value" id="gastos-totales">$0</p>
+                    </div>
+                    <div class="summary-card purple">
+                        <p class="summary-label">Ganancia</p>
+                        <p class="summary-value" id="ganancia-total">$0</p>
+                    </div>
+                </div>
+
+                <!-- Cuadre detallado -->
+                <div class="detailed-summary">
+                    <h3>📊 Resumen Completo del Día</h3>
+                    
+                    <div class="payment-method efectivo">
+                        <div class="method-header">
+                            <span class="method-label">💵 EFECTIVO</span>
+                            <span class="method-total" id="efectivo-esperado">$0</span>
+                        </div>
+                        <div class="method-details">
+                            <div class="detail-row">
+                                <span>Monto inicial:</span>
+                                <span id="detail-inicial">$0</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>+ Ventas efectivo:</span>
+                                <span class="positive" id="detail-ventas-efectivo">+$0</span>
+                            </div>
+                            <div class="detail-row">
+                                <span>- Gastos:</span>
+                                <span class="negative" id="detail-gastos">-$0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="payment-method tarjeta">
+                        <div class="method-header">
+                            <span class="method-label">💳 TARJETA</span>
+                            <span class="method-total" id="tarjeta-total">$0</span>
+                        </div>
+                        <p class="method-note" id="tarjeta-note">Verificar reportes del datáfono</p>
+                    </div>
+
+                    <div class="payment-method transferencia">
+                        <div class="method-header">
+                            <span class="method-label">🏦 TRANSFERENCIAS</span>
+                            <span class="method-total" id="transferencia-total">$0</span>
+                        </div>
+                        <p class="method-note" id="transferencia-note">Verificar extracto bancario</p>
+                    </div>
+
+                    <div class="payment-method total">
+                        <div class="method-header">
+                            <span class="method-label">💰 TOTAL GENERAL</span>
+                            <span class="method-total" id="total-general">$0</span>
+                        </div>
+                        <div class="method-details">
+                            <div class="detail-row">
+                                <span>Ganancia neta:</span>
+                                <span id="ganancia-neta">$0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gastos del día -->
+                <div class="gastos-section">
+                    <h3>Gastos del Día</h3>
+                    <div id="gastos-list" class="gastos-list"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Modal</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Contenido dinámico -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
