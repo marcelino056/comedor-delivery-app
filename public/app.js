@@ -8,12 +8,13 @@ let state = {
     filtroEstado: 'todos',
     ws: null,
     ventaActual: 0,
-    historialVisible: false
+    historialVisible: false,
+    fechaSeleccionada: new Date().toISOString().split('T')[0] // Fecha actual por defecto
 };
 
 // Configuración
 const API_BASE = window.location.origin + '/api';
-const WS_URL = `ws://${window.location.hostname}:3006`;
+const WS_URL = `ws://${window.location.hostname}:3007`;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
@@ -49,13 +50,88 @@ async function initApp() {
 
 function updateCurrentDate() {
     const fechaElement = document.getElementById('fecha-actual');
-    const fecha = new Date().toLocaleDateString('es-CO', {
+    const fechaSelector = document.getElementById('fecha-selector');
+    
+    // Actualizar el selector de fecha
+    fechaSelector.value = state.fechaSeleccionada;
+    
+    // Crear objeto de fecha para mostrar
+    const fecha = new Date(state.fechaSeleccionada + 'T00:00:00');
+    const fechaFormateada = fecha.toLocaleDateString('es-CO', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
     });
-    fechaElement.textContent = fecha;
+    
+    // Marcar si es hoy, ayer, etc.
+    const hoy = new Date().toISOString().split('T')[0];
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    const ayerStr = ayer.toISOString().split('T')[0];
+    
+    let etiqueta = '';
+    if (state.fechaSeleccionada === hoy) {
+        etiqueta = ' (HOY)';
+    } else if (state.fechaSeleccionada === ayerStr) {
+        etiqueta = ' (AYER)';
+    } else if (state.fechaSeleccionada > hoy) {
+        etiqueta = ' (FUTURO)';
+    }
+    
+    fechaElement.textContent = fechaFormateada + etiqueta;
+}
+
+// Funciones de navegación de fecha
+function cambiarFecha(dias) {
+    const fechaActual = new Date(state.fechaSeleccionada + 'T00:00:00');
+    fechaActual.setDate(fechaActual.getDate() + dias);
+    state.fechaSeleccionada = fechaActual.toISOString().split('T')[0];
+    
+    updateCurrentDate();
+    cargarDatosFecha();
+}
+
+function cambiarFechaSeleccionada() {
+    const fechaSelector = document.getElementById('fecha-selector');
+    state.fechaSeleccionada = fechaSelector.value;
+    
+    updateCurrentDate();
+    cargarDatosFecha();
+}
+
+function irAHoy() {
+    state.fechaSeleccionada = new Date().toISOString().split('T')[0];
+    updateCurrentDate();
+    cargarDatosFecha();
+}
+
+// Cargar datos para la fecha seleccionada
+async function cargarDatosFecha() {
+    showLoading(true);
+    try {
+        const [ventasRes, ordenesRes, gastosRes] = await Promise.all([
+            fetch(`${API_BASE}/ventas?fecha=${state.fechaSeleccionada}`),
+            fetch(`${API_BASE}/ordenes?fecha=${state.fechaSeleccionada}`),
+            fetch(`${API_BASE}/gastos?fecha=${state.fechaSeleccionada}`)
+        ]);
+
+        state.ventas = await ventasRes.json();
+        state.ordenes = await ordenesRes.json();
+        state.gastos = await gastosRes.json();
+
+        // Cargar monto inicial para la fecha seleccionada
+        const montoRes = await fetch(`${API_BASE}/monto-inicial/${state.fechaSeleccionada}`);
+        const montoData = await montoRes.json();
+        state.montoInicial[state.fechaSeleccionada] = montoData.monto;
+
+        // Actualizar todas las vistas
+        updateAllViews();
+    } catch (error) {
+        console.error('Error cargando datos para la fecha:', error);
+    } finally {
+        showLoading(false);
+    }
 }
 
 function setupEventListeners() {
@@ -84,29 +160,8 @@ function setupEventListeners() {
 }
 
 async function loadInitialData() {
-    showLoading(true);
-    try {
-        const [ventasRes, ordenesRes, gastosRes] = await Promise.all([
-            fetch(`${API_BASE}/ventas`),
-            fetch(`${API_BASE}/ordenes`),
-            fetch(`${API_BASE}/gastos`)
-        ]);
-
-        state.ventas = await ventasRes.json();
-        state.ordenes = await ordenesRes.json();
-        state.gastos = await gastosRes.json();
-
-        // Cargar monto inicial del día actual
-        const hoy = new Date().toISOString().split('T')[0];
-        const montoRes = await fetch(`${API_BASE}/monto-inicial/${hoy}`);
-        const montoData = await montoRes.json();
-        state.montoInicial[hoy] = montoData.monto;
-
-    } catch (error) {
-        console.error('Error cargando datos:', error);
-    } finally {
-        showLoading(false);
-    }
+    // Cargar datos para la fecha seleccionada (hoy por defecto)
+    await cargarDatosFecha();
 }
 
 function connectWebSocket() {
@@ -636,14 +691,81 @@ function updateAllViews() {
     updateVentasView();
     updateOrdenesView(); 
     updateCajaView();
+    updateControlsState();
     
     // Inicializar el display de venta
     actualizarDisplayVenta();
 }
 
+// Actualizar estado de controles basado en la fecha seleccionada
+function updateControlsState() {
+    const fechaEsHoy = esHoy();
+    
+    // Panel de nueva venta
+    const ventaPanel = document.getElementById('nueva-venta-panel');
+    if (ventaPanel) {
+        if (fechaEsHoy) {
+            ventaPanel.classList.remove('disabled');
+        } else {
+            ventaPanel.classList.add('disabled');
+        }
+    }
+    
+    // Deshabilitar botones de acción si no es hoy
+    const botonesAccion = document.querySelectorAll('.payment-method-btn, .quick-amount-btn, .keypad-btn');
+    botonesAccion.forEach(btn => {
+        btn.disabled = !fechaEsHoy;
+        if (!fechaEsHoy) {
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        } else {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        }
+    });
+    
+    // Deshabilitar botones de nueva orden y gasto
+    const botonesNuevos = document.querySelectorAll('[onclick*="openModal"]');
+    botonesNuevos.forEach(btn => {
+        if (!fechaEsHoy) {
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+            btn.setAttribute('title', 'Solo disponible para el día actual');
+        } else {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+            btn.removeAttribute('title');
+        }
+    });
+    
+    // Mostrar mensaje informativo si no es hoy
+    let infoMessage = document.getElementById('fecha-info-message');
+    if (!fechaEsHoy) {
+        if (!infoMessage) {
+            infoMessage = document.createElement('div');
+            infoMessage.id = 'fecha-info-message';
+            infoMessage.className = 'fecha-info-message';
+            infoMessage.innerHTML = `
+                <div class="info-icon">📅</div>
+                <div class="info-text">
+                    <strong>Viendo fecha anterior</strong><br>
+                    Los controles de creación y edición están deshabilitados
+                </div>
+            `;
+            document.querySelector('.content').insertBefore(infoMessage, document.querySelector('.content').firstChild);
+        }
+        infoMessage.style.display = 'flex';
+    } else {
+        if (infoMessage) {
+            infoMessage.style.display = 'none';
+        }
+    }
+}
+
 function updateVentasView() {
     const container = document.getElementById('ventas-list');
     const ventasRecientes = state.ventas.slice(0, 10);
+    const fechaEsHoy = esHoy();
 
     container.innerHTML = ventasRecientes.map(venta => `
         <div class="item-card ${venta.anulada ? 'anulada' : ''}">
@@ -656,7 +778,7 @@ function updateVentasView() {
                 <div class="item-controls">
                     <div class="item-meta">
                         <span class="status-badge">Venta Local</span>
-                        ${!venta.anulada ? `
+                        ${!venta.anulada && fechaEsHoy ? `
                             <button class="delete-btn" onclick="anularVenta(${venta.id})" title="Anular venta">
                                 🗑️
                             </button>
@@ -675,6 +797,8 @@ function updateOrdenesView() {
     // Filtrar y ordenar órdenes
     let ordenesFiltradas = filterOrdenes();
     ordenesFiltradas = sortOrdenes(ordenesFiltradas);
+    
+    const fechaEsHoy = esHoy();
 
     const container = document.getElementById('ordenes-list');
     const ordenesRecientes = ordenesFiltradas.slice(0, 20);
@@ -706,7 +830,7 @@ function updateOrdenesView() {
                         <p>🚚 Delivery: ${formatCurrency(orden.costoDelivery)}</p>
                         <p class="total">💵 Total: ${formatCurrency(orden.total)}</p>
                     </div>
-                    ${!orden.anulada ? `
+                    ${!orden.anulada && fechaEsHoy ? `
                         <div class="payment-buttons">
                             <button class="payment-btn efectivo ${orden.metodoPago === 'efectivo' ? 'active' : ''}" 
                                     onclick="cambiarMetodoPagoOrden(${orden.id}, 'efectivo')">
@@ -721,6 +845,11 @@ function updateOrdenesView() {
                                 🏦 Transfer
                             </button>
                         </div>
+                    ` : !orden.anulada ? `
+                        <div class="payment-status">
+                            <span class="payment-status-label">Método de pago: </span>
+                            <span class="payment-status-value">${orden.metodoPago.toUpperCase()}</span>
+                        </div>
                     ` : ''}
                     <p style="font-size: 0.75rem; color: #6b7280; margin-top: 0.5rem;">
                         ${formatDateTime(orden.timestamp)}
@@ -731,13 +860,13 @@ function updateOrdenesView() {
                         <span style="font-size: 0.75rem; font-weight: 600; color: #3b82f6;">
                             ${orden.repartidor}
                         </span>
-                        ${!orden.anulada ? `
+                        ${!orden.anulada && fechaEsHoy ? `
                             <button class="delete-btn" onclick="anularOrden(${orden.id})" title="Anular orden">
                                 🗑️
                             </button>
                         ` : ''}
                     </div>
-                    ${!orden.anulada ? `
+                    ${!orden.anulada && fechaEsHoy ? `
                         <div class="state-buttons">
                             <button class="state-btn recibida ${orden.estado === 'recibida' ? 'active' : ''}"
                                     onclick="cambiarEstadoOrden(${orden.id}, 'recibida')">
@@ -755,6 +884,12 @@ function updateOrdenesView() {
                                     onclick="cambiarEstadoOrden(${orden.id}, 'entregada')">
                                 Entregada
                             </button>
+                        </div>
+                    ` : !orden.anulada ? `
+                        <div class="state-display">
+                            <span style="font-size: 0.75rem; color: #6b7280; border: 1px solid #d1d5db; border-radius: 0.25rem; padding: 0.25rem 0.5rem;">
+                                ${orden.estado.toUpperCase().replace('-', ' ')}
+                            </span>
                         </div>
                     ` : `
                         <span style="font-size: 0.75rem; color: #6b7280; border: 1px solid #d1d5db; border-radius: 0.25rem; padding: 0.25rem 0.5rem; margin-top: 0.5rem;">
@@ -868,19 +1003,21 @@ function updateCajaView() {
 }
 
 function updateGastosList() {
-    const hoy = new Date().toDateString();
-    const gastosHoy = state.gastos.filter(g => 
-        new Date(g.timestamp).toDateString() === hoy
+    const fechaSeleccionada = new Date(state.fechaSeleccionada + 'T00:00:00').toDateString();
+    const gastosFecha = state.gastos.filter(g => 
+        new Date(g.timestamp).toDateString() === fechaSeleccionada
     ).slice(0, 10);
 
     const container = document.getElementById('gastos-list');
     
-    if (gastosHoy.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 1rem;">No hay gastos registrados hoy</p>';
+    if (gastosFecha.length === 0) {
+        const esHoy = state.fechaSeleccionada === new Date().toISOString().split('T')[0];
+        const mensaje = esHoy ? 'No hay gastos registrados hoy' : 'No hay gastos registrados en esta fecha';
+        container.innerHTML = `<p style="text-align: center; color: #6b7280; padding: 1rem;">${mensaje}</p>`;
         return;
     }
 
-    container.innerHTML = gastosHoy.map(gasto => `
+    container.innerHTML = gastosFecha.map(gasto => `
         <div class="gasto-item">
             <div class="gasto-header">
                 <span class="gasto-concepto">${gasto.concepto}</span>
@@ -892,51 +1029,50 @@ function updateGastosList() {
 }
 
 function calcularTotalesDia() {
-    const hoy = new Date().toDateString();
+    const fechaSeleccionada = new Date(state.fechaSeleccionada + 'T00:00:00').toDateString();
     
-    const ventasHoy = state.ventas.filter(v => 
-        new Date(v.timestamp).toDateString() === hoy && !v.anulada
+    const ventasFecha = state.ventas.filter(v => 
+        new Date(v.timestamp).toDateString() === fechaSeleccionada && !v.anulada
     );
     
-    const gastosHoy = state.gastos.filter(g => 
-        new Date(g.timestamp).toDateString() === hoy
+    const gastosFecha = state.gastos.filter(g => 
+        new Date(g.timestamp).toDateString() === fechaSeleccionada
     );
 
-    const ordenesHoy = state.ordenes.filter(o => 
-        new Date(o.timestamp).toDateString() === hoy && !o.anulada
+    const ordenesFecha = state.ordenes.filter(o => 
+        new Date(o.timestamp).toDateString() === fechaSeleccionada && !o.anulada
     );
 
-    const totalVentasLocal = ventasHoy.reduce((sum, venta) => sum + venta.monto, 0);
-    const totalVentasDelivery = ordenesHoy.reduce((sum, orden) => sum + orden.total, 0);
+    const totalVentasLocal = ventasFecha.reduce((sum, venta) => sum + venta.monto, 0);
+    const totalVentasDelivery = ordenesFecha.reduce((sum, orden) => sum + orden.total, 0);
     const totalVentas = totalVentasLocal + totalVentasDelivery;
-    const totalGastos = gastosHoy.reduce((sum, gasto) => sum + gasto.monto, 0);
-    const totalTransacciones = ventasHoy.length + ordenesHoy.length;
+    const totalGastos = gastosFecha.reduce((sum, gasto) => sum + gasto.monto, 0);
+    const totalTransacciones = ventasFecha.length + ordenesFecha.length;
     
     // Calcular ventas por método de pago
-    const ventasEfectivo = ventasHoy
+    const ventasEfectivo = ventasFecha
         .filter(item => item.metodoPago === 'efectivo')
         .reduce((sum, item) => sum + item.monto, 0) +
-        ordenesHoy
+        ordenesFecha
         .filter(item => item.metodoPago === 'efectivo')
         .reduce((sum, item) => sum + item.total, 0);
     
-    const ventasTarjeta = ventasHoy
+    const ventasTarjeta = ventasFecha
         .filter(item => item.metodoPago === 'tarjeta')
         .reduce((sum, item) => sum + item.monto, 0) +
-        ordenesHoy
+        ordenesFecha
         .filter(item => item.metodoPago === 'tarjeta')
         .reduce((sum, item) => sum + item.total, 0);
     
-    const ventasTransferencia = ventasHoy
+    const ventasTransferencia = ventasFecha
         .filter(item => item.metodoPago === 'transferencia')
         .reduce((sum, item) => sum + item.monto, 0) +
-        ordenesHoy
+        ordenesFecha
         .filter(item => item.metodoPago === 'transferencia')
         .reduce((sum, item) => sum + item.total, 0);
     
-    // Monto inicial del día
-    const fechaHoy = new Date().toISOString().split('T')[0];
-    const montoInicial = state.montoInicial[fechaHoy] || 0;
+    // Monto inicial del día seleccionado
+    const montoInicial = state.montoInicial[state.fechaSeleccionada] || 0;
     
     // Efectivo esperado en caja
     const efectivoEsperado = montoInicial + ventasEfectivo - totalGastos;
@@ -946,8 +1082,8 @@ function calcularTotalesDia() {
         totalGastos,
         totalTransacciones,
         ganancia: totalVentas - totalGastos,
-        ventasLocales: ventasHoy.length,
-        delivery: ordenesHoy.length,
+        ventasLocales: ventasFecha.length,
+        delivery: ordenesFecha.length,
         montoInicial,
         ventasEfectivo,
         ventasTarjeta,
@@ -957,6 +1093,10 @@ function calcularTotalesDia() {
 }
 
 // Utilidades
+function esHoy() {
+    return state.fechaSeleccionada === new Date().toISOString().split('T')[0];
+}
+
 function formatCurrency(amount) {
     return new Intl.NumberFormat('es-CO', {
         style: 'currency',
@@ -1110,3 +1250,38 @@ window.establecerMonto = establecerMonto;
 window.procesarVenta = procesarVenta;
 window.toggleHistorialVentas = toggleHistorialVentas;
 window.setFilter = setFilter;
+window.generarReporteDiario = generarReporteDiario;
+
+// Generar reporte diario en PDF
+async function generarReporteDiario() {
+    try {
+        showLoading(true);
+        
+        const hoy = new Date().toISOString().split('T')[0];
+        const response = await fetch(`${API_BASE}/reporte-diario/${hoy}`);
+        
+        if (!response.ok) {
+            throw new Error('Error al generar el reporte');
+        }
+        
+        // Crear blob con el PDF
+        const blob = await response.blob();
+        
+        // Crear URL temporal y descargar
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte-diario-${hoy.replace(/-/g, '')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showLoading(false);
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error generando reporte:', error);
+        alert('❌ Error al generar el reporte. Inténtalo nuevamente.');
+    }
+}

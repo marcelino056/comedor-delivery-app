@@ -22,6 +22,7 @@ Sistema de gestión completo para comedores con servicio de delivery. PWA (Progr
 - Separación por método de pago (efectivo, tarjeta, transferencia)
 - Registro de gastos con auditoría completa
 - Cálculo automático de ganancias
+- **📄 Reportes PDF diarios**: Generación automática de reportes de cierre de caja
 
 ## 🚀 Instalación
 
@@ -126,6 +127,7 @@ npm uninstall sqlite3
 2. **Operación**: Registrar ventas y pedidos
 3. **Seguimiento**: Usar filtros para gestionar delivery
 4. **Cierre**: Revisar cuadre automático en "Caja"
+5. **📄 Reporte**: Generar reporte PDF diario para archivo y auditoría
 
 ## 🛠️ Tecnologías
 
@@ -167,6 +169,9 @@ npm uninstall sqlite3
 ### Caja
 - `GET /api/monto-inicial/:fecha` - Obtener monto inicial
 - `POST /api/monto-inicial` - Establecer monto inicial
+
+### Reportes
+- `GET /api/reporte-diario/:fecha` - Generar reporte PDF del día
 
 ### Migración
 - `POST /api/migrate-from-sqlite` - Migrar datos desde SQLite

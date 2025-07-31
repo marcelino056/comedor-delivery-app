@@ -16,7 +16,15 @@
         <!-- Header -->
         <header class="header">
             <h1>Comedor & Delivery</h1>
-            <p id="fecha-actual"></p>
+            <div class="fecha-container">
+                <p id="fecha-actual"></p>
+                <div class="fecha-controls">
+                    <button class="btn-fecha" onclick="cambiarFecha(-1)" title="Día anterior">◀</button>
+                    <input type="date" id="fecha-selector" onchange="cambiarFechaSeleccionada()" />
+                    <button class="btn-fecha" onclick="cambiarFecha(1)" title="Día siguiente">▶</button>
+                    <button class="btn-fecha btn-hoy" onclick="irAHoy()" title="Ir a hoy">HOY</button>
+                </div>
+            </div>
         </header>
 
         <!-- Navigation -->
@@ -162,6 +170,9 @@
                 <div class="tab-header">
                     <h2>Control de Caja</h2>
                     <div class="header-buttons">
+                        <button id="btn-reporte-diario" class="btn-success" onclick="generarReporteDiario()">
+                            📄 Generar Reporte PDF
+                        </button>
                         <button id="btn-monto-inicial" class="btn-secondary hidden" onclick="openModal('montoInicial')">
                             💰 Monto Inicial
                         </button>
