@@ -200,33 +200,60 @@ body {
     background: #3b82f6;
     color: white;
     border: none;
-    border-radius: 50%;
-    width: 48px;
-    height: 48px;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+    gap: 0.5rem;
     transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
 .btn-primary:hover {
     background: #2563eb;
     transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Botón circular para headers */
+.btn-primary.btn-circle {
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    min-width: 48px;
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary.btn-circle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
 }
 
 .btn-secondary {
-    background: #3b82f6;
+    background: #6b7280;
     color: white;
     border: none;
     border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
     font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.5rem;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(107, 114, 128, 0.2);
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(107, 114, 128, 0.3);
 }
 
 .btn-danger {
@@ -234,12 +261,21 @@ body {
     color: white;
     border: none;
     border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
     font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
 }
 
 .btn-success {
@@ -247,18 +283,21 @@ body {
     color: white;
     border: none;
     border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
     font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.5rem;
     transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
 }
 
 .btn-success:hover {
     background: #059669;
     transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
 /* Filters */
@@ -271,17 +310,27 @@ body {
 
 .filter-btn {
     background: #f3f4f6;
-    border: none;
+    border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
     padding: 0.75rem;
     cursor: pointer;
     text-align: center;
     transition: all 0.2s;
+    font-weight: 500;
+    color: #374151;
+}
+
+.filter-btn:hover {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+    transform: translateY(-1px);
 }
 
 .filter-btn.active {
     background: #374151;
     color: white;
+    border-color: #374151;
+    box-shadow: 0 2px 4px rgba(55, 65, 81, 0.2);
 }
 
 .filter-btn.filter-preparando.active {
@@ -764,27 +813,45 @@ body {
     justify-content: center;
     z-index: 1000;
     padding: 1rem;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.modal.hidden {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .modal-content {
     background: #fff;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     width: 100%;
-    max-width: 400px;
+    max-width: 500px;
     max-height: 90vh;
     overflow-y: auto;
+    transform: scale(1);
+    transition: transform 0.3s ease;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modal.hidden .modal-content {
+    transform: scale(0.95);
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem;
+    padding: 1.5rem;
     border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    border-radius: 0.75rem 0.75rem 0 0;
 }
 
 .modal-header h3 {
     font-weight: 600;
+    font-size: 1.125rem;
+    color: #1f2937;
 }
 
 .modal-close {
@@ -793,10 +860,32 @@ body {
     font-size: 1.5rem;
     cursor: pointer;
     color: #6b7280;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: #f3f4f6;
+    color: #374151;
 }
 
 .modal-body {
-    padding: 1rem;
+    padding: 1.5rem;
+}
+
+/* Modal actions */
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
 }
 
 .form-group {
@@ -818,6 +907,23 @@ body {
     border: 1px solid #d1d5db;
     border-radius: 0.5rem;
     font-size: 1rem;
+    background: #fff;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    background: #fefefe;
+}
+
+.form-group input:hover,
+.form-group select:hover,
+.form-group textarea:hover {
+    border-color: #9ca3af;
 }
 
 .form-group textarea {
@@ -1372,4 +1478,751 @@ body {
 .state-display {
     margin-top: 0.5rem;
     text-align: center;
+}
+
+/* ============= ESTILOS PARA CLIENTES Y FACTURAS ============= */
+
+/* Búsqueda de clientes */
+.search-container {
+    margin-bottom: 1rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    background: white;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Card de cliente */
+.cliente-card {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.cliente-header {
+    display: flex;
+    justify-content: between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.cliente-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.cliente-telefono {
+    font-size: 0.875rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.cliente-rnc {
+    font-size: 0.75rem;
+    background: #f3f4f6;
+    color: #374151;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.cliente-direccion {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.5rem;
+}
+
+.cliente-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+/* Filtros de facturas */
+.facturas-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.filter-group label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.filter-group select,
+.filter-group input {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    background: white;
+}
+
+/* Card de factura */
+.factura-card {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.factura-card.anulada {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.factura-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.factura-numero {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.factura-tipo {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.factura-tipo.FACTURA {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.factura-tipo.BOLETA {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.factura-cliente {
+    font-size: 0.875rem;
+    color: #374151;
+    margin-bottom: 0.25rem;
+}
+
+.factura-fecha {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.factura-total {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #059669;
+}
+
+.factura-rnc {
+    font-size: 0.75rem;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+.factura-anulada {
+    font-size: 0.75rem;
+    background: #fee2e2;
+    color: #dc2626;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.factura-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+/* Productos en modal de factura */
+.productos-section {
+    margin: 1rem 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.producto-item {
+    background: #f9fafb;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e7eb;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.form-row .form-group {
+    margin-bottom: 0;
+}
+
+.form-row input {
+    width: 100%;
+}
+
+.producto-total {
+    background: #f3f4f6 !important;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+/* Totales de factura */
+.totales-section {
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    border: 1px solid #e5e7eb;
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-size: 0.875rem;
+}
+
+.total-row.total-final {
+    border-top: 1px solid #d1d5db;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+/* Botones adicionales */
+.btn-link {
+    background: none;
+    border: none;
+    color: #3b82f6;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 0;
+    margin-top: 0.25rem;
+}
+
+.btn-link:hover {
+    color: #2563eb;
+}
+
+.btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Botones adicionales - remover duplicados */
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+    border: 1px solid #f59e0b;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+    border-color: #d97706;
+}
+
+/* Formulario de configuración RNC */
+.form-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+/* Estados de secuencias RNC */
+.secuencia-estado {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.secuencia-estado.activa {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.secuencia-estado.inactiva {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.secuencia-estado.por-vencer {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Responsive para formularios de productos */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .facturas-filters {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .filter-group {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .filter-group label {
+        min-width: 80px;
+        margin-bottom: 0;
+    }
+}
+
+/* Configuraciones RNC */
+.configuracion-card {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.configuracion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.configuracion-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.configuracion-descripcion {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.configuracion-detalles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.detalle-item {
+    font-size: 0.75rem;
+    color: #374151;
+}
+
+.detalle-label {
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.detalle-valor {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.progreso-secuencia {
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.progreso-barra {
+    background: #e5e7eb;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.progreso-fill {
+    background: #10b981;
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progreso-texto {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+/* Créditos Styles */
+.creditos-filters {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.creditos-summary {
+    margin-bottom: 1.5rem;
+}
+
+.summary-card.orange {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.credit-info {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.credit-status {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.5rem;
+}
+
+.credit-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.credit-item:last-child {
+    border-bottom: none;
+}
+
+.credit-item span:first-child {
+    font-weight: 500;
+    color: #374151;
+}
+
+.credit-item span:last-child {
+    font-weight: 600;
+    color: #111827;
+}
+
+.productos-container {
+    margin: 1rem 0;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 1rem;
+    background: #f9fafb;
+}
+
+.productos-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.productos-header h4 {
+    margin: 0;
+    color: #374151;
+}
+
+.productos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.producto-item {
+    display: grid;
+    grid-template-columns: 2fr 80px 100px 40px;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.producto-item input {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.conduce-totals {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.total-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    font-size: 0.875rem;
+}
+
+.total-final {
+    border-top: 2px solid #374151;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.conduces-container {
+    margin: 1rem 0;
+}
+
+.conduces-checklist {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.conduce-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.conduce-item:hover {
+    background: #f9fafb;
+}
+
+.conduce-item:last-child {
+    border-bottom: none;
+}
+
+.conduce-item input[type="checkbox"] {
+    margin-right: 0.75rem;
+    transform: scale(1.2);
+}
+
+.conduce-details {
+    flex: 1;
+}
+
+.conduce-numero {
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.25rem;
+}
+
+.conduce-fecha {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.conduce-total {
+    font-weight: 600;
+    color: #059669;
+    font-size: 1rem;
+}
+
+.pago-summary {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+}
+
+.summary-item:last-child {
+    border-top: 1px solid #d1d5db;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.conduce-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.conduce-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.conduce-header h4 {
+    margin: 0;
+    color: #111827;
+}
+
+.conduce-estado {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.conduce-estado.pendiente {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.conduce-estado.pagado {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.conduce-estado.anulado {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.conduce-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.conduce-productos {
+    background: #f9fafb;
+    border-radius: 4px;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+}
+
+.conduce-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* Responsive para créditos */
+@media (max-width: 768px) {
+    .creditos-filters {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .producto-item {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+    }
+    
+    .conduce-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .conduce-actions {
+        flex-direction: column;
+    }
+}
+
+/* Configuración de crédito en modal de cliente */
+.credito-config {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.5rem 0;
+}
+
+.credito-config.hidden {
+    display: none;
+}
+
+.credito-config .form-group {
+    margin-bottom: 0.75rem;
+}
+
+.credito-config .form-group:last-child {
+    margin-bottom: 0;
 }

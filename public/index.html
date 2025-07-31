@@ -37,6 +37,18 @@
                 <span class="icon">📦</span>
                 <span>Delivery</span>
             </button>
+            <button class="tab-btn" data-tab="clientes">
+                <span class="icon">👥</span>
+                <span>Clientes</span>
+            </button>
+            <button class="tab-btn" data-tab="facturas">
+                <span class="icon">📄</span>
+                <span>Facturas</span>
+            </button>
+            <button class="tab-btn" data-tab="creditos">
+                <span class="icon">💳</span>
+                <span>Créditos</span>
+            </button>
             <button class="tab-btn" data-tab="caja">
                 <span class="icon">💰</span>
                 <span>Caja</span>
@@ -128,7 +140,7 @@
             <div id="ordenes-tab" class="tab-content">
                 <div class="tab-header">
                     <h2>Delivery</h2>
-                    <button class="btn-primary" onclick="openModal('orden')">
+                    <button class="btn-primary btn-circle" onclick="openModal('orden')">
                         <span class="icon">➕</span>
                     </button>
                 </div>
@@ -163,6 +175,132 @@
 
                 <div id="filter-info" class="filter-info hidden"></div>
                 <div id="ordenes-list" class="items-list"></div>
+            </div>
+
+            <!-- Clientes Tab -->
+            <div id="clientes-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Gestión de Clientes</h2>
+                    <button class="btn-primary" onclick="openModal('cliente')">
+                        <span class="icon">➕</span>
+                        Agregar Cliente
+                    </button>
+                </div>
+                
+                <div class="search-container">
+                    <input type="text" id="buscar-cliente" placeholder="Buscar cliente por nombre, teléfono o RNC..." 
+                           onkeyup="filtrarClientes()" class="search-input">
+                </div>
+                
+                <div id="clientes-list" class="items-list"></div>
+            </div>
+
+            <!-- Facturas Tab -->
+            <div id="facturas-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Facturación</h2>
+                    <div class="header-buttons">
+                        <button class="btn-primary" onclick="openModal('factura')">
+                            <span class="icon">📄</span>
+                            Nueva Factura
+                        </button>
+                        <button class="btn-secondary" onclick="openModal('configuracion-rnc')">
+                            <span class="icon">⚙️</span>
+                            Config. RNC
+                        </button>
+                        <button class="btn-success" onclick="generarReporteRNC()">
+                            <span class="icon">📊</span>
+                            Reporte RNC
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filtros de Facturas -->
+                <div class="facturas-filters">
+                    <div class="filter-group">
+                        <label>Período:</label>
+                        <select id="filtro-periodo" onchange="filtrarFacturas()">
+                            <option value="hoy">Hoy</option>
+                            <option value="mes">Este mes</option>
+                            <option value="personalizado">Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="filtro-fechas" style="display: none;">
+                        <input type="date" id="fecha-desde" onchange="filtrarFacturas()">
+                        <span>hasta</span>
+                        <input type="date" id="fecha-hasta" onchange="filtrarFacturas()">
+                    </div>
+                    <div class="filter-group">
+                        <label>Tipo:</label>
+                        <select id="filtro-tipo" onchange="filtrarFacturas()">
+                            <option value="">Todos</option>
+                            <option value="FACTURA">Facturas</option>
+                            <option value="BOLETA">Boletas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Con RNC:</label>
+                        <select id="filtro-rnc" onchange="filtrarFacturas()">
+                            <option value="">Todos</option>
+                            <option value="true">Solo con RNC</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="facturas-list" class="items-list"></div>
+            </div>
+
+            <!-- Créditos Tab -->
+            <div id="creditos-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Gestión de Créditos</h2>
+                    <div class="header-buttons">
+                        <button class="btn-primary" onclick="openModal('conduce')">
+                            <span class="icon">📝</span>
+                            Nuevo Conduce
+                        </button>
+                        <button class="btn-success" onclick="openModal('pagar-creditos')">
+                            <span class="icon">💰</span>
+                            Pagar Créditos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filtros de Créditos -->
+                <div class="creditos-filters">
+                    <div class="filter-group">
+                        <label>Estado:</label>
+                        <select id="filtro-estado-credito" onchange="filtrarCreditos()">
+                            <option value="">Todos</option>
+                            <option value="pendiente">Pendientes</option>
+                            <option value="pagado">Pagados</option>
+                            <option value="anulado">Anulados</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Cliente:</label>
+                        <select id="filtro-cliente-credito" onchange="filtrarCreditos()">
+                            <option value="">Todos los clientes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Resumen de Créditos -->
+                <div class="summary-grid creditos-summary">
+                    <div class="summary-card orange">
+                        <p class="summary-label">Créditos Pendientes</p>
+                        <p class="summary-value" id="creditos-pendientes-total">$0</p>
+                        <p class="summary-detail" id="creditos-pendientes-count">0 conduces</p>
+                    </div>
+                    <div class="summary-card green">
+                        <p class="summary-label">Pagados Hoy</p>
+                        <p class="summary-value" id="creditos-pagados-hoy">$0</p>
+                        <p class="summary-detail" id="creditos-pagados-count">0 facturas</p>
+                    </div>
+                </div>
+
+                <!-- Lista de Conduces -->
+                <div id="conduces-list" class="items-list"></div>
             </div>
 
             <!-- Caja Tab -->
@@ -268,6 +406,313 @@
             </div>
         </main>
     </div>
+
+    <!-- Templates de Modales -->
+    <template id="template-cliente-modal">
+        <form id="form-cliente" onsubmit="guardarCliente(event)">
+            <div class="form-group">
+                <label for="cliente-nombre">Nombre *</label>
+                <input type="text" id="cliente-nombre" required>
+            </div>
+            <div class="form-group">
+                <label for="cliente-telefono">Teléfono *</label>
+                <input type="tel" id="cliente-telefono" required>
+            </div>
+            <div class="form-group">
+                <label for="cliente-rnc">RNC (opcional)</label>
+                <input type="text" id="cliente-rnc" placeholder="123456789">
+            </div>
+            <div class="form-group">
+                <label for="cliente-direccion">Dirección</label>
+                <textarea id="cliente-direccion" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="cliente-email">Email</label>
+                <input type="email" id="cliente-email">
+            </div>
+            
+            <!-- Configuración de Crédito -->
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="cliente-credito-habilitado" onchange="toggleCreditoFields()"> 
+                    Habilitar crédito
+                </label>
+            </div>
+            
+            <div id="credito-fields" class="credito-config hidden">
+                <div class="form-group">
+                    <label for="cliente-limite-credito">Límite de Crédito ($)</label>
+                    <input type="number" id="cliente-limite-credito" min="0" step="0.01" value="1000">
+                </div>
+                <div class="form-group">
+                    <label for="cliente-dias-credito">Días de Crédito</label>
+                    <input type="number" id="cliente-dias-credito" min="1" value="30">
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Guardar Cliente</button>
+            </div>
+        </form>
+    </template>
+
+    <template id="template-factura-modal">
+        <form id="form-factura" onsubmit="generarFactura(event)">
+            <div class="form-group">
+                <label for="factura-cliente">Cliente *</label>
+                <select id="factura-cliente" required onchange="actualizarDatosCliente()">
+                    <option value="">Seleccionar cliente...</option>
+                </select>
+                <button type="button" class="btn-link" onclick="openModal('cliente')">+ Agregar nuevo cliente</button>
+            </div>
+            
+            <div class="form-group">
+                <label for="factura-tipo">Tipo de Comprobante *</label>
+                <select id="factura-tipo" required onchange="toggleRNCOptions()">
+                    <option value="BOLETA">Boleta (Sin RNC)</option>
+                    <option value="FACTURA">Factura (Con RNC)</option>
+                </select>
+            </div>
+            
+            <div id="rnc-options" class="form-group hidden">
+                <label>
+                    <input type="checkbox" id="requiere-rnc"> 
+                    Requiere RNC para facturación fiscal
+                </label>
+                <small class="form-hint">Solo marcar si el cliente necesita RNC para fines fiscales</small>
+            </div>
+
+            <div class="productos-section">
+                <div class="section-header">
+                    <h4>Productos/Servicios</h4>
+                    <button type="button" class="btn-secondary btn-sm" onclick="agregarProducto()">+ Agregar Producto</button>
+                </div>
+                <div id="productos-container">
+                    <div class="producto-item">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <input type="text" placeholder="Descripción *" class="producto-descripcion" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="number" placeholder="Cant." class="producto-cantidad" min="1" value="1" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="number" placeholder="Precio" class="producto-precio" step="0.01" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="number" placeholder="Total" class="producto-total" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="totales-section">
+                <div class="total-row">
+                    <span>Subtotal:</span>
+                    <span id="factura-subtotal">$0.00</span>
+                </div>
+                <div class="total-row">
+                    <span>ITBIS (18%):</span>
+                    <span id="factura-impuesto">$0.00</span>
+                </div>
+                <div class="total-row total-final">
+                    <span>TOTAL:</span>
+                    <span id="factura-total">$0.00</span>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Generar Factura</button>
+            </div>
+        </form>
+    </template>
+
+    <template id="template-configuracion-rnc-modal">
+        <div class="configuraciones-existentes">
+            <h4>Configuraciones Existentes</h4>
+            <div class="configuraciones-rnc-list"></div>
+        </div>
+        
+        <hr style="margin: 1rem 0;">
+        
+        <form id="form-configuracion-rnc" onsubmit="guardarConfiguracionRNC(event)">
+            <h4>Agregar Nueva Configuración</h4>
+            <div class="form-group">
+                <label for="rnc-nombre">Nombre de Secuencia *</label>
+                <input type="text" id="rnc-nombre" placeholder="Ej: B01, B02, etc." required>
+            </div>
+            <div class="form-group">
+                <label for="rnc-descripcion">Descripción *</label>
+                <input type="text" id="rnc-descripcion" placeholder="Ej: Secuencia B01 - Facturas Comerciales" required>
+            </div>
+            <div class="form-group">
+                <label for="rnc-prefijo">Prefijo *</label>
+                <input type="text" id="rnc-prefijo" placeholder="Ej: B01" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="rnc-inicio">Número Inicial *</label>
+                    <input type="number" id="rnc-inicio" min="1" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="rnc-final">Número Final *</label>
+                    <input type="number" id="rnc-final" min="1" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="rnc-vencimiento">Fecha de Vencimiento *</label>
+                <input type="date" id="rnc-vencimiento" required>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="rnc-activa" checked> 
+                    Activar esta secuencia
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Guardar Configuración</button>
+            </div>
+        </form>
+    </template>
+
+    <template id="template-reporte-rnc-modal">
+        <form id="form-reporte-rnc" onsubmit="descargarReporteRNC(event)">
+            <div class="form-group">
+                <label for="reporte-mes">Mes *</label>
+                <select id="reporte-mes" required>
+                    <option value="1">Enero</option>
+                    <option value="2">Febrero</option>
+                    <option value="3">Marzo</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Mayo</option>
+                    <option value="6">Junio</option>
+                    <option value="7">Julio</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="reporte-anio">Año *</label>
+                <input type="number" id="reporte-anio" min="2020" required>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-success">Descargar Reporte PDF</button>
+            </div>
+        </form>
+    </template>
+
+    <template id="template-conduce-modal">
+        <form id="conduce-form" onsubmit="guardarConduce(event)">
+            <div class="form-group">
+                <label for="conduce-cliente">Cliente *</label>
+                <select id="conduce-cliente" required onchange="verificarCreditoCliente()">
+                    <option value="">Seleccione un cliente</option>
+                </select>
+                <button type="button" class="btn-link" onclick="openModal('cliente')">+ Agregar nuevo cliente</button>
+            </div>
+            
+            <div id="credito-info" class="credit-info hidden">
+                <div class="credit-status">
+                    <div class="credit-item">
+                        <span>Límite de Crédito:</span>
+                        <span id="limite-credito">$0</span>
+                    </div>
+                    <div class="credit-item">
+                        <span>Saldo Pendiente:</span>
+                        <span id="saldo-pendiente">$0</span>
+                    </div>
+                    <div class="credit-item">
+                        <span>Disponible:</span>
+                        <span id="credito-disponible">$0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="productos-container">
+                <div class="productos-header">
+                    <h4>Productos</h4>
+                    <button type="button" class="btn-success btn-sm" onclick="agregarProductoConduce()">+ Agregar Producto</button>
+                </div>
+                <div id="productos-conduce" class="productos-list">
+                    <div class="producto-item">
+                        <input type="text" placeholder="Descripción del producto" name="descripcion" required>
+                        <input type="number" placeholder="Cantidad" name="cantidad" min="1" required onchange="calcularTotalConduce()">
+                        <input type="number" placeholder="Precio" name="precio" min="0" step="0.01" required onchange="calcularTotalConduce()">
+                        <button type="button" class="btn-danger btn-sm" onclick="eliminarProductoConduce(this)">✕</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="conduce-totals">
+                <div class="total-item">
+                    <span>Subtotal:</span>
+                    <span id="conduce-subtotal">$0.00</span>
+                </div>
+                <div class="total-item">
+                    <span>ITBIS (18%):</span>
+                    <span id="conduce-impuesto">$0.00</span>
+                </div>
+                <div class="total-item total-final">
+                    <span>Total:</span>
+                    <span id="conduce-total">$0.00</span>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-success" id="btn-guardar-conduce">Generar Conduce</button>
+            </div>
+        </form>
+    </template>
+
+    <template id="template-pagar-creditos-modal">
+        <form id="pagar-creditos-form" onsubmit="pagarCreditos(event)">
+            <div class="form-group">
+                <label for="pago-cliente">Cliente *</label>
+                <select id="pago-cliente" required onchange="cargarConducesPendientes()">
+                    <option value="">Seleccione un cliente</option>
+                </select>
+            </div>
+
+            <div id="conduces-pendientes" class="conduces-container hidden">
+                <h4>Conduces Pendientes</h4>
+                <div id="conduces-list-pago" class="conduces-checklist">
+                    <!-- Lista de conduces pendientes con checkboxes -->
+                </div>
+                
+                <div class="pago-summary">
+                    <div class="summary-item">
+                        <span>Conduces Seleccionados:</span>
+                        <span id="conduces-seleccionados-count">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Total a Pagar:</span>
+                        <span id="total-pagar">$0.00</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="generar-factura-rnc"> 
+                        Generar factura con RNC
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-success" id="btn-pagar-creditos" disabled>Procesar Pago</button>
+            </div>
+        </form>
+    </template>
 
     <!-- Modal -->
     <div id="modal" class="modal hidden">

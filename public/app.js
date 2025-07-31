@@ -4,6 +4,9 @@ let state = {
     ordenes: [],
     gastos: [],
     montoInicial: {},
+    clientes: [],
+    facturas: [],
+    configuracionesRNC: [],
     activeTab: 'ventas',
     filtroEstado: 'todos',
     ws: null,
@@ -162,6 +165,13 @@ function setupEventListeners() {
 async function loadInitialData() {
     // Cargar datos para la fecha seleccionada (hoy por defecto)
     await cargarDatosFecha();
+    
+    // Cargar clientes y configuraciones
+    await cargarClientes();
+    await cargarConfiguracionesRNC();
+    
+    // Cargar créditos
+    await loadCreditos();
 }
 
 function connectWebSocket() {
@@ -255,6 +265,15 @@ function switchTab(tabName) {
         case 'ordenes':
             updateOrdenesView();
             break;
+        case 'clientes':
+            updateClientesView();
+            break;
+        case 'facturas':
+            cargarFacturas();
+            break;
+        case 'creditos':
+            loadCreditos();
+            break;
         case 'caja':
             updateCajaView();
             break;
@@ -307,9 +326,72 @@ function openModal(type) {
             title.textContent = 'Establecer Monto Inicial de Caja';
             body.innerHTML = getMontoInicialModalContent();
             break;
+        case 'cliente':
+            title.textContent = 'Nuevo Cliente';
+            body.innerHTML = getTemplateContent('template-cliente-modal');
+            break;
+        case 'factura':
+            title.textContent = 'Nueva Factura';
+            body.innerHTML = getTemplateContent('template-factura-modal');
+            setTimeout(() => setupFacturaModal(), 100);
+            break;
+        case 'configuracion-rnc':
+            title.textContent = 'Configuración RNC';
+            body.innerHTML = getTemplateContent('template-configuracion-rnc-modal');
+            setTimeout(() => updateConfiguracionesRNCView(), 100);
+            break;
+        case 'reporte-rnc':
+            title.textContent = 'Generar Reporte RNC';
+            body.innerHTML = getTemplateContent('template-reporte-rnc-modal');
+            break;
+        case 'conduce':
+            title.textContent = 'Nuevo Conduce a Crédito';
+            body.innerHTML = getTemplateContent('template-conduce-modal');
+            setTimeout(() => {
+                console.log('Configurando modal de conduce...');
+                setupConduceModal();
+            }, 100);
+            break;
+        case 'pagar-creditos':
+            title.textContent = 'Pagar Créditos';
+            body.innerHTML = getTemplateContent('template-pagar-creditos-modal');
+            // Forzar rebinding inmediato del evento y feedback
+            setTimeout(() => {
+                setupPagarCreditosModal();
+                // Forzar feedback visual y habilitar botón
+                const btn = document.getElementById('btn-pagar-creditos');
+                if (btn) btn.disabled = true;
+                const form = document.getElementById('pagar-creditos-form');
+                if (form) {
+                    form.onsubmit = pagarCreditos;
+                }
+            }, 50);
+            break;
     }
 
     modal.classList.remove('hidden');
+}
+
+function getTemplateContent(templateId) {
+    const template = document.getElementById(templateId);
+    return template ? template.innerHTML : '';
+}
+
+function setupFacturaModal() {
+    // Cargar clientes en el select
+    const clienteSelect = document.getElementById('factura-cliente');
+    if (clienteSelect) {
+        clienteSelect.innerHTML = '<option value="">Seleccionar cliente...</option>' +
+            state.clientes.map(cliente => 
+                `<option value="${cliente._id}">${cliente.nombre} - ${cliente.telefono}</option>`
+            ).join('');
+    }
+    
+    // Configurar eventos de cálculo en el primer producto
+    const primerProducto = document.querySelector('.producto-item');
+    if (primerProducto) {
+        setupProductoCalculation(primerProducto);
+    }
 }
 
 function closeModal() {
@@ -1283,5 +1365,1228 @@ async function generarReporteDiario() {
         showLoading(false);
         console.error('Error generando reporte:', error);
         alert('❌ Error al generar el reporte. Inténtalo nuevamente.');
+    }
+}
+
+// ============= FUNCIONES DE CLIENTES =============
+
+async function cargarClientes() {
+    try {
+        const response = await fetch(`${API_BASE}/clientes`);
+        state.clientes = await response.json();
+        updateClientesView();
+    } catch (error) {
+        console.error('Error cargando clientes:', error);
+    }
+}
+
+function updateClientesView() {
+    const list = document.getElementById('clientes-list');
+    if (!list) return;
+
+    if (state.clientes.length === 0) {
+        list.innerHTML = '<p class="no-data">No hay clientes registrados</p>';
+        return;
+    }
+
+    list.innerHTML = state.clientes.map(cliente => `
+        <div class="cliente-card">
+            <div class="cliente-header">
+                <div class="cliente-info">
+                    <h4>${cliente.nombre}</h4>
+                    <div class="cliente-telefono">
+                        📞 ${cliente.telefono}
+                    </div>
+                    ${cliente.rnc ? `<span class="cliente-rnc">RNC: ${cliente.rnc}</span>` : ''}
+                </div>
+            </div>
+            ${cliente.direccion ? `<div class="cliente-direccion">📍 ${cliente.direccion}</div>` : ''}
+            ${cliente.email ? `<div class="cliente-email">✉️ ${cliente.email}</div>` : ''}
+            <div class="cliente-actions">
+                <button class="btn-secondary btn-sm" onclick="editarCliente('${cliente._id}')">
+                    ✏️ Editar
+                </button>
+                <button class="btn-primary btn-sm" onclick="crearFacturaParaCliente('${cliente._id}')">
+                    📄 Facturar
+                </button>
+                <button class="btn-danger btn-sm" onclick="desactivarCliente('${cliente._id}')">
+                    🗑️ Desactivar
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function filtrarClientes() {
+    const busqueda = document.getElementById('buscar-cliente').value.toLowerCase();
+    const clientesFiltrados = state.clientes.filter(cliente => 
+        cliente.nombre.toLowerCase().includes(busqueda) ||
+        cliente.telefono.includes(busqueda) ||
+        (cliente.rnc && cliente.rnc.includes(busqueda))
+    );
+
+    const list = document.getElementById('clientes-list');
+    if (clientesFiltrados.length === 0) {
+        list.innerHTML = '<p class="no-data">No se encontraron clientes</p>';
+        return;
+    }
+
+    list.innerHTML = clientesFiltrados.map(cliente => `
+        <div class="cliente-card">
+            <div class="cliente-header">
+                <div class="cliente-info">
+                    <h4>${cliente.nombre}</h4>
+                    <div class="cliente-telefono">
+                        📞 ${cliente.telefono}
+                    </div>
+                    ${cliente.rnc ? `<span class="cliente-rnc">RNC: ${cliente.rnc}</span>` : ''}
+                </div>
+            </div>
+            ${cliente.direccion ? `<div class="cliente-direccion">📍 ${cliente.direccion}</div>` : ''}
+            ${cliente.email ? `<div class="cliente-email">✉️ ${cliente.email}</div>` : ''}
+            <div class="cliente-actions">
+                <button class="btn-secondary btn-sm" onclick="editarCliente('${cliente._id}')">
+                    ✏️ Editar
+                </button>
+                <button class="btn-primary btn-sm" onclick="crearFacturaParaCliente('${cliente._id}')">
+                    📄 Facturar
+                </button>
+                <button class="btn-danger btn-sm" onclick="desactivarCliente('${cliente._id}')">
+                    🗑️ Desactivar
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function guardarCliente(event) {
+    event.preventDefault();
+    
+    try {
+        showLoading(true);
+        
+        const creditoHabilitado = document.getElementById('cliente-credito-habilitado').checked;
+        
+        const formData = {
+            nombre: document.getElementById('cliente-nombre').value,
+            telefono: document.getElementById('cliente-telefono').value,
+            rnc: document.getElementById('cliente-rnc').value,
+            direccion: document.getElementById('cliente-direccion').value,
+            email: document.getElementById('cliente-email').value,
+            creditoHabilitado: creditoHabilitado,
+            limiteCredito: creditoHabilitado ? parseFloat(document.getElementById('cliente-limite-credito').value) || 0 : 0,
+            diasCredito: creditoHabilitado ? parseInt(document.getElementById('cliente-dias-credito').value) || 30 : 0
+        };
+
+        const clienteId = document.getElementById('form-cliente').dataset.clienteId;
+        const method = clienteId ? 'PUT' : 'POST';
+        const url = clienteId ? `${API_BASE}/clientes/${clienteId}` : `${API_BASE}/clientes`;
+
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) throw new Error('Error al guardar cliente');
+
+        const cliente = await response.json();
+        
+        if (clienteId) {
+            // Actualizar cliente existente
+            const index = state.clientes.findIndex(c => c._id === clienteId);
+            if (index !== -1) {
+                state.clientes[index] = cliente;
+            }
+        } else {
+            // Agregar nuevo cliente
+            state.clientes.unshift(cliente);
+        }
+
+        updateClientesView();
+        closeModal();
+        showLoading(false);
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error guardando cliente:', error);
+        alert('❌ Error al guardar cliente');
+    }
+}
+
+async function editarCliente(id) {
+    const cliente = state.clientes.find(c => c._id === id);
+    if (!cliente) return;
+
+    openModal('cliente');
+    
+    // Llenar formulario
+    document.getElementById('cliente-nombre').value = cliente.nombre;
+    document.getElementById('cliente-telefono').value = cliente.telefono;
+    document.getElementById('cliente-rnc').value = cliente.rnc || '';
+    document.getElementById('cliente-direccion').value = cliente.direccion || '';
+    document.getElementById('cliente-email').value = cliente.email || '';
+    
+    // Marcar como edición
+    document.getElementById('form-cliente').dataset.clienteId = id;
+    document.getElementById('modal-title').textContent = 'Editar Cliente';
+}
+
+async function desactivarCliente(id) {
+    if (!confirm('¿Estás seguro de desactivar este cliente?')) return;
+
+    try {
+        showLoading(true);
+        
+        const response = await fetch(`${API_BASE}/clientes/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Error al desactivar cliente');
+
+        // Remover de la lista
+        state.clientes = state.clientes.filter(c => c._id !== id);
+        updateClientesView();
+        showLoading(false);
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error desactivando cliente:', error);
+        alert('❌ Error al desactivar cliente');
+    }
+}
+
+// ============= FUNCIONES DE FACTURAS =============
+
+async function cargarFacturas() {
+    try {
+        const filtros = new URLSearchParams();
+        
+        const periodo = document.getElementById('filtro-periodo')?.value || 'hoy';
+        const tipo = document.getElementById('filtro-tipo')?.value;
+        const rnc = document.getElementById('filtro-rnc')?.value;
+
+        if (periodo === 'hoy') {
+            filtros.append('fecha', state.fechaSeleccionada);
+        } else if (periodo === 'mes') {
+            const fecha = new Date();
+            filtros.append('mes', fecha.getMonth() + 1);
+            filtros.append('anio', fecha.getFullYear());
+        } else if (periodo === 'personalizado') {
+            const desde = document.getElementById('fecha-desde')?.value;
+            const hasta = document.getElementById('fecha-hasta')?.value;
+            if (desde) filtros.append('fechaDesde', desde);
+            if (hasta) filtros.append('fechaHasta', hasta);
+        }
+
+        if (tipo) filtros.append('tipo', tipo);
+        if (rnc) filtros.append('rnc', rnc);
+
+        const response = await fetch(`${API_BASE}/facturas?${filtros}`);
+        state.facturas = await response.json();
+        updateFacturasView();
+    } catch (error) {
+        console.error('Error cargando facturas:', error);
+    }
+}
+
+function updateFacturasView() {
+    const list = document.getElementById('facturas-list');
+    if (!list) return;
+
+    if (state.facturas.length === 0) {
+        list.innerHTML = '<p class="no-data">No hay facturas para los filtros seleccionados</p>';
+        return;
+    }
+
+    list.innerHTML = state.facturas.map(factura => `
+        <div class="factura-card ${factura.anulada ? 'anulada' : ''}">
+            <div class="factura-header">
+                <div>
+                    <div class="factura-numero">${factura.numero}</div>
+                    <span class="factura-tipo ${factura.tipoComprobante}">${factura.tipoComprobante}</span>
+                    ${factura.anulada ? '<span class="factura-anulada">ANULADA</span>' : ''}
+                </div>
+                <div class="factura-total">$${factura.total.toFixed(2)}</div>
+            </div>
+            <div class="factura-cliente">${factura.cliente.nombre}</div>
+            <div class="factura-fecha">${new Date(factura.fechaEmision).toLocaleDateString('es-DO')}</div>
+            ${factura.rnc ? `<div class="factura-rnc">RNC: ${factura.rnc}</div>` : ''}
+            ${!factura.anulada ? `
+                <div class="factura-actions">
+                    <button class="btn-primary btn-sm" onclick="descargarFacturaPDF('${factura._id}')">
+                        📄 PDF
+                    </button>
+                    <button class="btn-warning btn-sm" onclick="anularFactura('${factura._id}')">
+                        ❌ Anular
+                    </button>
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
+}
+
+async function generarFactura(event) {
+    event.preventDefault();
+    
+    try {
+        showLoading(true);
+        
+        const clienteId = document.getElementById('factura-cliente').value;
+        const tipoComprobante = document.getElementById('factura-tipo').value;
+        const requiereRNC = document.getElementById('requiere-rnc').checked;
+        
+        // Recopilar productos
+        const productos = [];
+        const productosItems = document.querySelectorAll('.producto-item');
+        
+        productosItems.forEach(item => {
+            const descripcion = item.querySelector('.producto-descripcion').value;
+            const cantidad = parseInt(item.querySelector('.producto-cantidad').value);
+            const precioUnitario = parseFloat(item.querySelector('.producto-precio').value);
+            
+            if (descripcion && cantidad && precioUnitario) {
+                productos.push({
+                    descripcion,
+                    cantidad,
+                    precioUnitario
+                });
+            }
+        });
+
+        if (productos.length === 0) {
+            alert('Debe agregar al menos un producto');
+            showLoading(false);
+            return;
+        }
+
+        const response = await fetch(`${API_BASE}/facturas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                clienteId,
+                tipoComprobante,
+                requiereRNC,
+                productos
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al generar factura');
+        }
+
+        const factura = await response.json();
+        
+        // Actualizar lista
+        state.facturas.unshift(factura);
+        updateFacturasView();
+        
+        closeModal();
+        showLoading(false);
+        
+        // Preguntar si desea descargar PDF
+        if (confirm('Factura generada exitosamente. ¿Desea descargar el PDF?')) {
+            descargarFacturaPDF(factura._id);
+        }
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error generando factura:', error);
+        alert('❌ ' + error.message);
+    }
+}
+
+async function descargarFacturaPDF(facturaId) {
+    try {
+        showLoading(true);
+        
+        const response = await fetch(`${API_BASE}/facturas/${facturaId}/pdf`);
+        if (!response.ok) throw new Error('Error al generar PDF');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `factura-${facturaId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showLoading(false);
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error descargando PDF:', error);
+        alert('❌ Error al descargar PDF');
+    }
+}
+
+async function anularFactura(facturaId) {
+    const motivo = prompt('Ingrese el motivo de anulación:');
+    if (!motivo) return;
+
+    try {
+        showLoading(true);
+        
+        const response = await fetch(`${API_BASE}/facturas/${facturaId}/anular`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ motivo })
+        });
+
+        if (!response.ok) throw new Error('Error al anular factura');
+
+        const facturaAnulada = await response.json();
+        
+        // Actualizar en la lista
+        const index = state.facturas.findIndex(f => f._id === facturaId);
+        if (index !== -1) {
+            state.facturas[index] = facturaAnulada;
+        }
+
+        updateFacturasView();
+        showLoading(false);
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error anulando factura:', error);
+        alert('❌ Error al anular factura');
+    }
+}
+
+function crearFacturaParaCliente(clienteId) {
+    openModal('factura');
+    
+    // Preseleccionar cliente
+    setTimeout(() => {
+        document.getElementById('factura-cliente').value = clienteId;
+        actualizarDatosCliente();
+    }, 100);
+}
+
+function actualizarDatosCliente() {
+    const clienteId = document.getElementById('factura-cliente').value;
+    const cliente = state.clientes.find(c => c._id === clienteId);
+    
+    if (cliente && cliente.rnc) {
+        document.getElementById('factura-tipo').value = 'FACTURA';
+        toggleRNCOptions();
+    }
+}
+
+function toggleRNCOptions() {
+    const tipo = document.getElementById('factura-tipo').value;
+    const rncOptions = document.getElementById('rnc-options');
+    
+    if (tipo === 'FACTURA') {
+        rncOptions.classList.remove('hidden');
+    } else {
+        rncOptions.classList.add('hidden');
+        document.getElementById('requiere-rnc').checked = false;
+    }
+}
+
+function agregarProducto() {
+    const container = document.getElementById('productos-container');
+    const nuevoProducto = container.firstElementChild.cloneNode(true);
+    
+    // Limpiar valores
+    nuevoProducto.querySelectorAll('input').forEach(input => {
+        if (input.classList.contains('producto-cantidad')) {
+            input.value = '1';
+        } else if (!input.readOnly) {
+            input.value = '';
+        }
+    });
+    
+    // Agregar botón de eliminar
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger btn-sm';
+    deleteBtn.textContent = '🗑️';
+    deleteBtn.onclick = function() {
+        if (container.children.length > 1) {
+            container.removeChild(nuevoProducto);
+            calcularTotalesFactura();
+        }
+    };
+    
+    nuevoProducto.querySelector('.form-row').appendChild(deleteBtn);
+    container.appendChild(nuevoProducto);
+    
+    // Agregar eventos de cálculo
+    setupProductoCalculation(nuevoProducto);
+}
+
+function setupProductoCalculation(productoItem) {
+    const cantidad = productoItem.querySelector('.producto-cantidad');
+    const precio = productoItem.querySelector('.producto-precio');
+    const total = productoItem.querySelector('.producto-total');
+    
+    const calcular = () => {
+        const cant = parseFloat(cantidad.value) || 0;
+        const prec = parseFloat(precio.value) || 0;
+        total.value = (cant * prec).toFixed(2);
+        calcularTotalesFactura();
+    };
+    
+    cantidad.addEventListener('input', calcular);
+    precio.addEventListener('input', calcular);
+}
+
+function calcularTotalesFactura() {
+    let subtotal = 0;
+    
+    document.querySelectorAll('.producto-total').forEach(input => {
+        subtotal += parseFloat(input.value) || 0;
+    });
+    
+    const impuesto = subtotal * 0.18;
+    const total = subtotal + impuesto;
+    
+    document.getElementById('factura-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('factura-impuesto').textContent = `$${impuesto.toFixed(2)}`;
+    document.getElementById('factura-total').textContent = `$${total.toFixed(2)}`;
+}
+
+function filtrarFacturas() {
+    const periodo = document.getElementById('filtro-periodo').value;
+    const filtroFechas = document.getElementById('filtro-fechas');
+    
+    if (periodo === 'personalizado') {
+        filtroFechas.style.display = 'flex';
+    } else {
+        filtroFechas.style.display = 'none';
+    }
+    
+    cargarFacturas();
+}
+
+// ============= FUNCIONES DE CONFIGURACIÓN RNC =============
+
+async function cargarConfiguracionesRNC() {
+    try {
+        const response = await fetch(`${API_BASE}/configuracion-rnc`);
+        state.configuracionesRNC = await response.json();
+        updateConfiguracionesRNCView();
+    } catch (error) {
+        console.error('Error cargando configuraciones RNC:', error);
+    }
+}
+
+function updateConfiguracionesRNCView() {
+    const container = document.querySelector('.configuraciones-rnc-list');
+    if (!container) return;
+
+    if (state.configuracionesRNC.length === 0) {
+        container.innerHTML = '<p class="no-data">No hay configuraciones RNC</p>';
+        return;
+    }
+
+    container.innerHTML = state.configuracionesRNC.map(config => {
+        const usados = config.secuenciaActual - config.secuenciaInicial;
+        const disponibles = config.secuenciaFinal - config.secuenciaInicial + 1;
+        const porcentaje = (usados / disponibles) * 100;
+        
+        return `
+            <div class="configuracion-card">
+                <div class="configuracion-header">
+                    <div class="configuracion-info">
+                        <h4>${config.nombre} - ${config.prefijo}</h4>
+                        <div class="configuracion-descripcion">${config.descripcion}</div>
+                    </div>
+                    <span class="secuencia-estado ${config.activa ? 'activa' : 'inactiva'}">
+                        ${config.activa ? 'ACTIVA' : 'INACTIVA'}
+                    </span>
+                </div>
+                <div class="configuracion-detalles">
+                    <div class="detalle-item">
+                        <div class="detalle-label">Rango:</div>
+                        <div class="detalle-valor">${config.secuenciaInicial} - ${config.secuenciaFinal}</div>
+                    </div>
+                    <div class="detalle-item">
+                        <div class="detalle-label">Actual:</div>
+                        <div class="detalle-valor">${config.secuenciaActual}</div>
+                    </div>
+                    <div class="detalle-item">
+                        <div class="detalle-label">Vencimiento:</div>
+                        <div class="detalle-valor">${new Date(config.fechaVencimiento).toLocaleDateString('es-DO')}</div>
+                    </div>
+                </div>
+                <div class="progreso-secuencia">
+                    <div class="progreso-barra">
+                        <div class="progreso-fill" style="width: ${porcentaje}%"></div>
+                    </div>
+                    <div class="progreso-texto">${usados} de ${disponibles} utilizados (${porcentaje.toFixed(1)}%)</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function guardarConfiguracionRNC(event) {
+    event.preventDefault();
+    
+    try {
+        showLoading(true);
+        
+        const formData = {
+            nombre: document.getElementById('rnc-nombre').value,
+            descripcion: document.getElementById('rnc-descripcion').value,
+            prefijo: document.getElementById('rnc-prefijo').value,
+            secuenciaInicial: parseInt(document.getElementById('rnc-inicio').value),
+            secuenciaFinal: parseInt(document.getElementById('rnc-final').value),
+            fechaVencimiento: document.getElementById('rnc-vencimiento').value,
+            activa: document.getElementById('rnc-activa').checked
+        };
+
+        const response = await fetch(`${API_BASE}/configuracion-rnc`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) throw new Error('Error al guardar configuración');
+
+        const config = await response.json();
+        state.configuracionesRNC.unshift(config);
+        updateConfiguracionesRNCView();
+        
+        closeModal();
+        showLoading(false);
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error guardando configuración RNC:', error);
+        alert('❌ Error al guardar configuración RNC');
+    }
+}
+
+async function generarReporteRNC() {
+    openModal('reporte-rnc');
+    
+    // Establecer mes y año actual
+    const fecha = new Date();
+    document.getElementById('reporte-mes').value = fecha.getMonth() + 1;
+    document.getElementById('reporte-anio').value = fecha.getFullYear();
+}
+
+async function descargarReporteRNC(event) {
+    event.preventDefault();
+    
+    try {
+        showLoading(true);
+        
+        const mes = document.getElementById('reporte-mes').value;
+        const anio = document.getElementById('reporte-anio').value;
+        
+        const response = await fetch(`${API_BASE}/reportes/facturas-rnc?mes=${mes}&anio=${anio}`);
+        if (!response.ok) throw new Error('Error al generar reporte');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte-rnc-${mes}-${anio}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        closeModal();
+        showLoading(false);
+        
+    } catch (error) {
+        showLoading(false);
+        console.error('Error descargando reporte RNC:', error);
+        alert('❌ Error al descargar reporte RNC');
+    }
+}
+
+// Exponer funciones globalmente
+window.cargarClientes = cargarClientes;
+window.filtrarClientes = filtrarClientes;
+window.guardarCliente = guardarCliente;
+window.editarCliente = editarCliente;
+window.desactivarCliente = desactivarCliente;
+window.crearFacturaParaCliente = crearFacturaParaCliente;
+window.generarFactura = generarFactura;
+window.descargarFacturaPDF = descargarFacturaPDF;
+window.anularFactura = anularFactura;
+window.actualizarDatosCliente = actualizarDatosCliente;
+window.toggleRNCOptions = toggleRNCOptions;
+window.agregarProducto = agregarProducto;
+window.calcularTotalesFactura = calcularTotalesFactura;
+window.filtrarFacturas = filtrarFacturas;
+window.guardarConfiguracionRNC = guardarConfiguracionRNC;
+window.generarReporteRNC = generarReporteRNC;
+window.descargarReporteRNC = descargarReporteRNC;
+
+// Funciones de Créditos
+window.verificarCreditoCliente = verificarCreditoCliente;
+window.agregarProductoConduce = agregarProductoConduce;
+window.eliminarProductoConduce = eliminarProductoConduce;
+window.calcularTotalConduce = calcularTotalConduce;
+window.guardarConduce = guardarConduce;
+window.cargarConducesPendientes = cargarConducesPendientes;
+window.toggleConduceSelection = toggleConduceSelection;
+window.pagarCreditos = pagarCreditos;
+window.filtrarCreditos = filtrarCreditos;
+window.verConducePDF = verConducePDF;
+window.anularConduce = anularConduce;
+window.setupConduceModal = setupConduceModal;
+window.setupPagarCreditosModal = setupPagarCreditosModal;
+window.toggleCreditoFields = toggleCreditoFields;
+
+// ====== SISTEMA DE CRÉDITOS ======
+
+// Toggle para mostrar/ocultar campos de crédito
+function toggleCreditoFields() {
+    const creditoHabilitado = document.getElementById('cliente-credito-habilitado').checked;
+    const creditoFields = document.getElementById('credito-fields');
+    
+    if (creditoHabilitado) {
+        creditoFields.classList.remove('hidden');
+    } else {
+        creditoFields.classList.add('hidden');
+    }
+}
+
+// Verificar información de crédito del cliente
+async function verificarCreditoCliente() {
+    const clienteId = document.getElementById('conduce-cliente').value;
+    const creditoInfo = document.getElementById('credito-info');
+    
+    if (!clienteId) {
+        creditoInfo.classList.add('hidden');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/clientes/${clienteId}`);
+        const cliente = await response.json();
+        
+        if (cliente.creditoHabilitado) {
+            document.getElementById('limite-credito').textContent = `$${cliente.limiteCredito.toFixed(2)}`;
+            document.getElementById('saldo-pendiente').textContent = `$${cliente.saldoPendiente.toFixed(2)}`;
+            document.getElementById('credito-disponible').textContent = `$${(cliente.limiteCredito - cliente.saldoPendiente).toFixed(2)}`;
+            creditoInfo.classList.remove('hidden');
+        } else {
+            creditoInfo.classList.add('hidden');
+            showNotification('Este cliente no tiene crédito habilitado', 'warning');
+        }
+    } catch (error) {
+        console.error('Error verificando crédito:', error);
+        creditoInfo.classList.add('hidden');
+    }
+}
+
+// Agregar producto al conduce
+function agregarProductoConduce() {
+    const productosContainer = document.getElementById('productos-conduce');
+    const nuevoProducto = document.createElement('div');
+    nuevoProducto.className = 'producto-item';
+    nuevoProducto.innerHTML = `
+        <input type="text" placeholder="Descripción del producto" name="descripcion" required>
+        <input type="number" placeholder="Cantidad" name="cantidad" min="1" required onchange="calcularTotalConduce()">
+        <input type="number" placeholder="Precio" name="precio" min="0" step="0.01" required onchange="calcularTotalConduce()">
+        <button type="button" class="btn-danger btn-sm" onclick="eliminarProductoConduce(this)">✕</button>
+    `;
+    productosContainer.appendChild(nuevoProducto);
+}
+
+// Eliminar producto del conduce
+function eliminarProductoConduce(button) {
+    const productosContainer = document.getElementById('productos-conduce');
+    if (productosContainer.children.length > 1) {
+        button.closest('.producto-item').remove();
+        calcularTotalConduce();
+    }
+}
+
+// Calcular total del conduce
+function calcularTotalConduce() {
+    const productos = document.querySelectorAll('#productos-conduce .producto-item');
+    let subtotal = 0;
+    
+    productos.forEach(producto => {
+        const cantidad = parseFloat(producto.querySelector('[name="cantidad"]').value) || 0;
+        const precio = parseFloat(producto.querySelector('[name="precio"]').value) || 0;
+        subtotal += cantidad * precio;
+    });
+    
+    const impuesto = subtotal * 0.18;
+    const total = subtotal + impuesto;
+    
+    document.getElementById('conduce-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('conduce-impuesto').textContent = `$${impuesto.toFixed(2)}`;
+    document.getElementById('conduce-total').textContent = `$${total.toFixed(2)}`;
+    
+    // Verificar límite de crédito
+    const clienteId = document.getElementById('conduce-cliente').value;
+    if (clienteId) {
+        verificarLimiteCredito(total);
+    }
+}
+
+// Verificar límite de crédito disponible
+async function verificarLimiteCredito(totalConduce) {
+    const clienteId = document.getElementById('conduce-cliente').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/clientes/${clienteId}`);
+        const cliente = await response.json();
+        
+        const creditoDisponible = cliente.limiteCredito - cliente.saldoPendiente;
+        const btnGuardar = document.getElementById('btn-guardar-conduce');
+        
+        if (totalConduce > creditoDisponible) {
+            btnGuardar.disabled = true;
+            btnGuardar.textContent = 'Excede límite de crédito';
+            btnGuardar.className = 'btn-danger';
+        } else {
+            btnGuardar.disabled = false;
+            btnGuardar.textContent = 'Generar Conduce';
+            btnGuardar.className = 'btn-success';
+        }
+    } catch (error) {
+        console.error('Error verificando límite:', error);
+    }
+}
+
+// Guardar conduce
+async function guardarConduce(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const clienteId = formData.get('conduce-cliente') || document.getElementById('conduce-cliente').value;
+    
+    const productos = [];
+    const productosItems = document.querySelectorAll('#productos-conduce .producto-item');
+    
+    productosItems.forEach(item => {
+        const descripcion = item.querySelector('[name="descripcion"]').value;
+        const cantidad = parseFloat(item.querySelector('[name="cantidad"]').value);
+        const precio = parseFloat(item.querySelector('[name="precio"]').value);
+        
+        if (descripcion && cantidad && precio) {
+            productos.push({
+                descripcion,
+                cantidad,
+                precioUnitario: precio,
+                total: cantidad * precio
+            });
+        }
+    });
+    
+    if (productos.length === 0) {
+        showNotification('Debe agregar al menos un producto', 'error');
+        return;
+    }
+    
+    const conduceData = {
+        clienteId,
+        productos
+    };
+    
+    try {
+        showLoading(true);
+        const response = await fetch(`${API_BASE}/conduces`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(conduceData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear el conduce');
+        }
+        
+        const conduce = await response.json();
+        
+        closeModal();
+        showNotification('Conduce creado exitosamente', 'success');
+        await loadCreditos();
+        
+        // Preguntar si quiere descargar el PDF
+        if (confirm('¿Desea descargar el conduce en PDF?')) {
+            verConducePDF(conduce._id);
+        }
+        
+    } catch (error) {
+        console.error('Error guardando conduce:', error);
+        showNotification(error.message, 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Cargar conduces pendientes para pago
+async function cargarConducesPendientes() {
+    const clienteId = document.getElementById('pago-cliente').value;
+    const conducesContainer = document.getElementById('conduces-pendientes');
+    const conducesList = document.getElementById('conduces-list-pago');
+    
+    if (!clienteId) {
+        conducesContainer.classList.add('hidden');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/conduces?cliente=${clienteId}&estado=pendiente`);
+        const conduces = await response.json();
+        
+        if (conduces.length === 0) {
+            conducesList.innerHTML = '<div class="no-data">No hay conduces pendientes para este cliente</div>';
+        } else {
+            conducesList.innerHTML = conduces.map(conduce => `
+                <div class="conduce-item" onclick="toggleConduceSelection('${conduce._id}')">
+                    <input type="checkbox" id="conduce-${conduce._id}" onchange="updatePagoSummary()">
+                    <div class="conduce-details">
+                        <div class="conduce-numero">${conduce.numero}</div>
+                        <div class="conduce-fecha">${new Date(conduce.fechaCreacion).toLocaleDateString()}</div>
+                    </div>
+                    <div class="conduce-total">$${conduce.total.toFixed(2)}</div>
+                </div>
+            `).join('');
+        }
+        
+        conducesContainer.classList.remove('hidden');
+        updatePagoSummary();
+        
+    } catch (error) {
+        console.error('Error cargando conduces:', error);
+        showNotification('Error cargando conduces pendientes', 'error');
+    }
+}
+
+// Toggle selección de conduce
+function toggleConduceSelection(conduceId) {
+    const checkbox = document.getElementById(`conduce-${conduceId}`);
+    checkbox.checked = !checkbox.checked;
+    updatePagoSummary();
+}
+
+// Actualizar resumen de pago
+function updatePagoSummary() {
+    const checkboxes = document.querySelectorAll('#conduces-list-pago input[type="checkbox"]:checked');
+    const count = checkboxes.length;
+    
+    let total = 0;
+    checkboxes.forEach(checkbox => {
+        const conduceItem = checkbox.closest('.conduce-item');
+        const totalText = conduceItem.querySelector('.conduce-total').textContent;
+        total += parseFloat(totalText.replace('$', ''));
+    });
+    
+    document.getElementById('conduces-seleccionados-count').textContent = count;
+    document.getElementById('total-pagar').textContent = `$${total.toFixed(2)}`;
+    document.getElementById('btn-pagar-creditos').disabled = count === 0;
+}
+
+// Procesar pago de créditos
+async function pagarCreditos(event) {
+    event.preventDefault();
+    const btn = document.getElementById('btn-pagar-creditos');
+    if (btn) btn.disabled = true;
+    try {
+        const clienteId = document.getElementById('pago-cliente').value;
+        const checkboxes = document.querySelectorAll('#conduces-list-pago input[type="checkbox"]:checked');
+        const generarFacturaRNC = document.getElementById('generar-factura-rnc').checked;
+        const conducesIds = Array.from(checkboxes).map(cb => cb.id.replace('conduce-', ''));
+        console.log('Datos del pago:', { clienteId, conducesIds, generarFacturaRNC });
+        if (conducesIds.length === 0) {
+            showNotification('Debe seleccionar al menos un conduce', 'error');
+            if (btn) btn.disabled = false;
+            return;
+        }
+        showLoading(true);
+        // Crear factura agrupando los conduces
+        const facturaData = {
+            clienteId,
+            conducesIds,
+            tipoComprobante: generarFacturaRNC ? 'FACTURA' : 'BOLETA',
+            requiereRNC: generarFacturaRNC,
+            fechaEmision: state.fechaSeleccionada // YYYY-MM-DD
+        };
+        console.log('Enviando datos al servidor:', facturaData);
+        const response = await fetch(`${API_BASE}/facturas`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(facturaData)
+        });
+        console.log('Respuesta del servidor:', response.status, response.statusText);
+        if (!response.ok) {
+            let errorMsg = 'Error al procesar el pago';
+            try {
+                const error = await response.json();
+                errorMsg = error.error || errorMsg;
+                console.error('Error del servidor:', error);
+            } catch(e) {}
+            showNotification(errorMsg, 'error');
+            if (btn) btn.disabled = false;
+            return;
+        }
+        const factura = await response.json();
+        console.log('Factura creada:', factura);
+        closeModal();
+        showNotification('Pago procesado exitosamente', 'success');
+        await loadCreditos();
+        await cargarFacturas();
+        // Preguntar si quiere descargar la factura
+        if (factura && factura._id && confirm('¿Desea descargar la factura en PDF?')) {
+            descargarFacturaPDF(factura._id);
+        }
+    } catch (error) {
+        console.error('Error procesando pago:', error);
+        showNotification(error.message || 'Error inesperado al procesar el pago', 'error');
+    } finally {
+        showLoading(false);
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Cargar datos de créditos
+async function loadCreditos() {
+    try {
+        const [conducesResponse, clientesResponse] = await Promise.all([
+            fetch(`${API_BASE}/conduces`),
+            fetch(`${API_BASE}/clientes`)
+        ]);
+        
+        const conduces = await conducesResponse.json();
+        const clientes = await clientesResponse.json();
+        
+        // Actualizar estado global
+        state.conduces = conduces;
+        state.clientes = clientes; // Asegurar que tenemos los clientes actualizados
+        
+        // Actualizar resumen
+        updateCreditosSummary(conduces);
+        
+        // Actualizar lista de conduces
+        renderConducesList(conduces);
+        
+        // Actualizar filtros de clientes
+        updateClientFilters(clientes);
+        
+    } catch (error) {
+        console.error('Error cargando créditos:', error);
+        showNotification('Error cargando datos de créditos', 'error');
+    }
+}
+
+// Actualizar resumen de créditos
+function updateCreditosSummary(conduces) {
+    const pendientes = conduces.filter(c => c.estado === 'pendiente');
+    const pagadosHoy = conduces.filter(c => 
+        c.estado === 'pagado' && 
+        new Date(c.updatedAt).toDateString() === new Date().toDateString()
+    );
+    
+    const totalPendiente = pendientes.reduce((sum, c) => sum + c.total, 0);
+    const totalPagadoHoy = pagadosHoy.reduce((sum, c) => sum + c.total, 0);
+    
+    document.getElementById('creditos-pendientes-total').textContent = `$${totalPendiente.toFixed(2)}`;
+    document.getElementById('creditos-pendientes-count').textContent = `${pendientes.length} conduces`;
+    document.getElementById('creditos-pagados-hoy').textContent = `$${totalPagadoHoy.toFixed(2)}`;
+    document.getElementById('creditos-pagados-count').textContent = `${pagadosHoy.length} facturas`;
+}
+
+// Renderizar lista de conduces
+function renderConducesList(conduces) {
+    const container = document.getElementById('conduces-list');
+    
+    if (conduces.length === 0) {
+        container.innerHTML = '<div class="no-data">No hay conduces registrados</div>';
+        return;
+    }
+    
+    container.innerHTML = conduces.map(conduce => `
+        <div class="conduce-card">
+            <div class="conduce-header">
+                <h4>${conduce.numero}</h4>
+                <span class="conduce-estado ${conduce.estado}">${conduce.estado}</span>
+            </div>
+            <div class="conduce-info">
+                <div><strong>Cliente:</strong> ${conduce.cliente.nombre}</div>
+                <div><strong>Fecha:</strong> ${new Date(conduce.fechaCreacion).toLocaleDateString()}</div>
+                <div><strong>Total:</strong> $${conduce.total.toFixed(2)}</div>
+                <div><strong>Productos:</strong> ${conduce.productos.length} items</div>
+            </div>
+            <div class="conduce-productos">
+                ${conduce.productos.map(p => `${p.cantidad}x ${p.descripcion} - $${p.total.toFixed(2)}`).join('<br>')}
+            </div>
+            <div class="conduce-actions">
+                <button class="btn-info btn-sm" onclick="verConducePDF('${conduce._id}')">
+                    📄 Ver PDF
+                </button>
+                ${conduce.estado === 'pendiente' ? `
+                    <button class="btn-danger btn-sm" onclick="anularConduce('${conduce._id}')">
+                        ❌ Anular
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Actualizar filtros de clientes
+function updateClientFilters(clientes) {
+    const clientesCredito = clientes.filter(c => c.creditoHabilitado);
+    
+    // Filtro en la pestaña de créditos
+    const filtroCliente = document.getElementById('filtro-cliente-credito');
+    if (filtroCliente) {
+        filtroCliente.innerHTML = '<option value="">Todos los clientes</option>' +
+            clientesCredito.map(cliente => 
+                `<option value="${cliente._id}">${cliente.nombre}</option>`
+            ).join('');
+    }
+    
+    // Selector en modal de conduce
+    const selectConduce = document.getElementById('conduce-cliente');
+    if (selectConduce) {
+        selectConduce.innerHTML = '<option value="">Seleccione un cliente</option>' +
+            clientesCredito.map(cliente => 
+                `<option value="${cliente._id}">${cliente.nombre}</option>`
+            ).join('');
+    }
+    
+    // Selector en modal de pago
+    const selectPago = document.getElementById('pago-cliente');
+    if (selectPago) {
+        selectPago.innerHTML = '<option value="">Seleccione un cliente</option>' +
+            clientesCredito.map(cliente => 
+                `<option value="${cliente._id}">${cliente.nombre}</option>`
+            ).join('');
+    }
+}
+
+// Filtrar créditos
+function filtrarCreditos() {
+    const estadoFiltro = document.getElementById('filtro-estado-credito').value;
+    const clienteFiltro = document.getElementById('filtro-cliente-credito').value;
+    
+    let conducesFiltered = [...(state.conduces || [])];
+    
+    if (estadoFiltro) {
+        conducesFiltered = conducesFiltered.filter(c => c.estado === estadoFiltro);
+    }
+    
+    if (clienteFiltro) {
+        conducesFiltered = conducesFiltered.filter(c => c.cliente._id === clienteFiltro);
+    }
+    
+    renderConducesList(conducesFiltered);
+}
+
+// Ver conduce en PDF
+function verConducePDF(conduceId) {
+    window.open(`${API_BASE}/conduces/${conduceId}/pdf`, '_blank');
+}
+
+// Anular conduce
+async function anularConduce(conduceId) {
+    const motivo = prompt('Motivo de anulación:');
+    if (!motivo) return;
+    
+    try {
+        showLoading(true);
+        const response = await fetch(`${API_BASE}/conduces/${conduceId}/anular`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ motivo })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al anular conduce');
+        }
+        
+        showNotification('Conduce anulado exitosamente', 'success');
+        await loadCreditos();
+        
+    } catch (error) {
+        console.error('Error anulando conduce:', error);
+        showNotification(error.message, 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Configurar modal de conduce
+async function setupConduceModal() {
+    try {
+        console.log('Iniciando configuración de modal de conduce...');
+        console.log('Estado actual de clientes:', state.clientes?.length || 0);
+        
+        // Asegurar que tenemos los clientes cargados
+        if (!state.clientes || state.clientes.length === 0) {
+            console.log('Cargando clientes...');
+            await cargarClientes();
+        }
+        
+        // Cargar clientes con crédito habilitado
+        const clientesCredito = state.clientes.filter(c => c.creditoHabilitado);
+        console.log('Clientes con crédito encontrados:', clientesCredito.length);
+        
+        const selectCliente = document.getElementById('conduce-cliente');
+        console.log('Elemento select encontrado:', !!selectCliente);
+        
+        if (selectCliente) {
+            selectCliente.innerHTML = '<option value="">Seleccione un cliente</option>' +
+                clientesCredito.map(cliente => 
+                    `<option value="${cliente._id}">${cliente.nombre}</option>`
+                ).join('');
+            console.log('Opciones agregadas al select');
+        }
+        
+        // Inicializar cálculos
+        calcularTotalConduce();
+        
+        console.log('Modal de conduce configurado con', clientesCredito.length, 'clientes con crédito');
+    } catch (error) {
+        console.error('Error configurando modal de conduce:', error);
+        showNotification('Error cargando clientes', 'error');
+    }
+}
+
+// Configurar modal de pagar créditos
+async function setupPagarCreditosModal() {
+    try {
+        // Asegurar que tenemos los clientes cargados
+        if (!state.clientes || state.clientes.length === 0) {
+            await cargarClientes();
+        }
+        // Cargar clientes con crédito habilitado
+        const clientesCredito = state.clientes.filter(c => c.creditoHabilitado);
+        const selectCliente = document.getElementById('pago-cliente');
+        if (selectCliente) {
+            selectCliente.innerHTML = '<option value="">Seleccione un cliente</option>' +
+                clientesCredito.map(cliente => 
+                    `<option value="${cliente._id}">${cliente.nombre}</option>`
+                ).join('');
+        }
+        // Resetear campos de conduces y resumen
+        const conducesContainer = document.getElementById('conduces-pendientes');
+        if (conducesContainer) conducesContainer.classList.add('hidden');
+        const conducesList = document.getElementById('conduces-list-pago');
+        if (conducesList) conducesList.innerHTML = '';
+        document.getElementById('conduces-seleccionados-count').textContent = '0';
+        document.getElementById('total-pagar').textContent = '$0.00';
+        const btn = document.getElementById('btn-pagar-creditos');
+        if (btn) btn.disabled = true;
+    } catch (error) {
+        console.error('Error configurando modal de pago:', error);
+        showNotification('Error cargando clientes', 'error');
     }
 }

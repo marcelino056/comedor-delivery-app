@@ -4,6 +4,7 @@ const cors = require('cors');
 const WebSocket = require('ws');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const PDFDocument = require('pdfkit');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -40,6 +41,7 @@ const ventaSchema = new mongoose.Schema({
 
 const ordenSchema = new mongoose.Schema({
   cliente: { type: String, required: true },
+  clienteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente' },
   telefono: { type: String, required: true },
   direccion: { type: String, required: true },
   descripcion: { type: String, required: true },
@@ -74,11 +76,97 @@ const montoInicialSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Esquema de Clientes
+const clienteSchema = new mongoose.Schema({
+  nombre: { type: String, required: true },
+  telefono: { type: String, required: true },
+  rnc: { type: String, default: '' },
+  direccion: { type: String, default: '' },
+  email: { type: String, default: '' },
+  activo: { type: Boolean, default: true },
+  // Información de crédito
+  creditoHabilitado: { type: Boolean, default: false },
+  limiteCredito: { type: Number, default: 0 },
+  diasCredito: { type: Number, default: 30 }, // Días para pagar
+  saldoPendiente: { type: Number, default: 0 } // Calculado automáticamente
+}, {
+  timestamps: true
+});
+
+// Esquema de Productos para facturas
+const productoFacturaSchema = new mongoose.Schema({
+  descripcion: { type: String, required: true },
+  cantidad: { type: Number, required: true },
+  precioUnitario: { type: Number, required: true },
+  total: { type: Number, required: true }
+});
+
+// Esquema de Facturas
+const facturaSchema = new mongoose.Schema({
+  numero: { type: String, required: true, unique: true },
+  tipoComprobante: { type: String, required: true, enum: ['FACTURA', 'BOLETA'] },
+  cliente: { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente', required: true },
+  productos: [productoFacturaSchema],
+  subtotal: { type: Number, required: true },
+  impuesto: { type: Number, required: true }, // 18%
+  total: { type: Number, required: true },
+  fechaEmision: { type: Date, default: Date.now },
+  rnc: { type: String, default: '' },
+  secuencia: { type: String, default: '' },
+  anulada: { type: Boolean, default: false },
+  motivoAnulacion: { type: String, default: '' },
+  conduces: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Conduce' }]
+}, {
+  timestamps: true
+});
+
+// Esquema de Configuración RNC
+const configuracionRNCSchema = new mongoose.Schema({
+  nombre: { type: String, required: true }, // Ej: "B01", "B02", etc.
+  descripcion: { type: String, required: true },
+  prefijo: { type: String, required: true }, // Ej: "B01"
+  secuenciaInicial: { type: Number, required: true },
+  secuenciaFinal: { type: Number, required: true },
+  secuenciaActual: { type: Number, required: true },
+  activa: { type: Boolean, default: true },
+  fechaVencimiento: { type: Date, required: true }
+}, {
+  timestamps: true
+});
+
+// Esquema de Conduces (Documentos de Crédito)
+const conduceSchema = new mongoose.Schema({
+  numero: { type: String, required: true, unique: true },
+  cliente: { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente', required: true },
+  productos: [productoFacturaSchema],
+  subtotal: { type: Number, required: true },
+  impuesto: { type: Number, required: true }, // 18%
+  total: { type: Number, required: true },
+  fechaEmision: { type: Date, default: Date.now },
+  fechaVencimiento: { type: Date, required: true },
+  estado: { 
+    type: String, 
+    required: true, 
+    enum: ['pendiente', 'pagado', 'vencido', 'anulado'],
+    default: 'pendiente'
+  },
+  facturaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factura' }, // Cuando se paga
+  observaciones: { type: String, default: '' },
+  anulado: { type: Boolean, default: false },
+  motivoAnulacion: { type: String, default: '' }
+}, {
+  timestamps: true
+});
+
 // Modelos
 const Venta = mongoose.model('Venta', ventaSchema);
 const Orden = mongoose.model('Orden', ordenSchema);
 const Gasto = mongoose.model('Gasto', gastoSchema);
 const MontoInicial = mongoose.model('MontoInicial', montoInicialSchema);
+const Cliente = mongoose.model('Cliente', clienteSchema);
+const Factura = mongoose.model('Factura', facturaSchema);
+const ConfiguracionRNC = mongoose.model('ConfiguracionRNC', configuracionRNCSchema);
+const Conduce = mongoose.model('Conduce', conduceSchema);
 
 // WebSocket server para tiempo real
 const wss = new WebSocket.Server({ port: 3007 });
@@ -853,6 +941,688 @@ function generateReportHTML(data) {
     </html>
   `;
 }
+
+// ============= RUTAS API PARA CLIENTES =============
+
+// Obtener todos los clientes
+app.get('/api/clientes', async (req, res) => {
+  try {
+    const clientes = await Cliente.find({ activo: true }).sort({ nombre: 1 });
+    res.json(clientes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear cliente
+app.post('/api/clientes', async (req, res) => {
+  try {
+    const cliente = new Cliente(req.body);
+    await cliente.save();
+    res.json(cliente);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Actualizar cliente
+app.put('/api/clientes/:id', async (req, res) => {
+  try {
+    const cliente = await Cliente.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(cliente);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Desactivar cliente
+app.delete('/api/clientes/:id', async (req, res) => {
+  try {
+    await Cliente.findByIdAndUpdate(req.params.id, { activo: false });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= RUTAS API PARA CONFIGURACIÓN RNC =============
+
+// Obtener configuraciones RNC
+app.get('/api/configuracion-rnc', async (req, res) => {
+  try {
+    const configuraciones = await ConfiguracionRNC.find().sort({ nombre: 1 });
+    res.json(configuraciones);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear configuración RNC
+app.post('/api/configuracion-rnc', async (req, res) => {
+  try {
+    const config = new ConfiguracionRNC({
+      ...req.body,
+      secuenciaActual: req.body.secuenciaInicial
+    });
+    await config.save();
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Actualizar configuración RNC
+app.put('/api/configuracion-rnc/:id', async (req, res) => {
+  try {
+    const config = await ConfiguracionRNC.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= RUTAS API PARA CONDUCES =============
+
+// Obtener conduces con filtros
+app.get('/api/conduces', async (req, res) => {
+  try {
+    const { fecha, cliente, estado } = req.query;
+    let query = {};
+    
+    if (fecha) {
+      const startOfDay = new Date(fecha);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(fecha);
+      endOfDay.setHours(23, 59, 59, 999);
+      query.fechaEmision = { $gte: startOfDay, $lte: endOfDay };
+    }
+    
+    if (cliente) query.cliente = cliente;
+    if (estado) query.estado = estado;
+    
+    const conduces = await Conduce.find(query)
+      .populate('cliente', 'nombre telefono rnc')
+      .sort({ fechaEmision: -1 });
+    
+    res.json(conduces);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear conduce
+app.post('/api/conduces', async (req, res) => {
+  try {
+    const { clienteId, productos, diasVencimiento } = req.body;
+    
+    // Verificar que el cliente tenga crédito habilitado
+    const cliente = await Cliente.findById(clienteId);
+    if (!cliente.creditoHabilitado) {
+      return res.status(400).json({ error: 'Cliente no tiene crédito habilitado' });
+    }
+    
+    // Calcular totales
+    let subtotal = 0;
+    productos.forEach(producto => {
+      producto.total = producto.cantidad * producto.precioUnitario;
+      subtotal += producto.total;
+    });
+    
+    const impuesto = subtotal * 0.18;
+    const total = subtotal + impuesto;
+    
+    // Verificar límite de crédito
+    const nuevoSaldo = cliente.saldoPendiente + total;
+    if (nuevoSaldo > cliente.limiteCredito) {
+      return res.status(400).json({ 
+        error: `Límite de crédito excedido. Disponible: $${(cliente.limiteCredito - cliente.saldoPendiente).toFixed(2)}` 
+      });
+    }
+    
+    // Generar número de conduce
+    const count = await Conduce.countDocuments();
+    const numeroConduce = `CON-${(count + 1).toString().padStart(6, '0')}`;
+    
+    // Calcular fecha de vencimiento
+    const fechaVencimiento = new Date();
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + (diasVencimiento || cliente.diasCredito));
+    
+    const conduce = new Conduce({
+      numero: numeroConduce,
+      cliente: clienteId,
+      productos,
+      subtotal,
+      impuesto,
+      total,
+      fechaVencimiento
+    });
+    
+    await conduce.save();
+    
+    // Actualizar saldo del cliente
+    cliente.saldoPendiente = nuevoSaldo;
+    await cliente.save();
+    
+    await conduce.populate('cliente', 'nombre telefono rnc direccion');
+    
+    res.json(conduce);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generar PDF de conduce
+app.get('/api/conduces/:id/pdf', async (req, res) => {
+  try {
+    const conduce = await Conduce.findById(req.params.id).populate('cliente');
+    
+    if (!conduce) {
+      return res.status(404).json({ error: 'Conduce no encontrado' });
+    }
+    
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+    
+    // Configurar response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="conduce-${conduce.numero}.pdf"`);
+    
+    // Pipe PDF al response
+    doc.pipe(res);
+    
+    // Header de la empresa
+    doc.fontSize(20).text('COMEDOR & DELIVERY', 50, 50);
+    doc.fontSize(12).text('Sistema de Facturación', 50, 75);
+    doc.text('RNC: 123456789', 50, 90);
+    doc.text('Dirección: Tu Dirección Aquí', 50, 105);
+    doc.text('Teléfono: (809) 123-4567', 50, 120);
+    
+    // Información del conduce
+    doc.fontSize(16).text('CONDUCE DE CRÉDITO', 400, 50);
+    doc.fontSize(12).text(`No: ${conduce.numero}`, 400, 75);
+    doc.text(`Fecha: ${conduce.fechaEmision.toLocaleDateString('es-DO')}`, 400, 90);
+    doc.text(`Vence: ${conduce.fechaVencimiento.toLocaleDateString('es-DO')}`, 400, 105);
+    doc.text(`Estado: ${conduce.estado.toUpperCase()}`, 400, 120);
+    
+    // Información del cliente
+    doc.text('ENTREGAR A:', 50, 160);
+    doc.text(`Cliente: ${conduce.cliente.nombre}`, 50, 180);
+    doc.text(`Teléfono: ${conduce.cliente.telefono}`, 50, 195);
+    if (conduce.cliente.rnc) {
+      doc.text(`RNC: ${conduce.cliente.rnc}`, 50, 210);
+    }
+    if (conduce.cliente.direccion) {
+      doc.text(`Dirección: ${conduce.cliente.direccion}`, 50, 225);
+    }
+    
+    // Tabla de productos
+    let yPosition = 260;
+    doc.text('DESCRIPCIÓN', 50, yPosition);
+    doc.text('CANT.', 300, yPosition);
+    doc.text('PRECIO', 360, yPosition);
+    doc.text('TOTAL', 450, yPosition);
+    
+    // Línea separadora
+    doc.moveTo(50, yPosition + 15).lineTo(550, yPosition + 15).stroke();
+    yPosition += 30;
+    
+    conduce.productos.forEach(producto => {
+      doc.text(producto.descripcion, 50, yPosition);
+      doc.text(producto.cantidad.toString(), 300, yPosition);
+      doc.text(`$${producto.precioUnitario.toFixed(2)}`, 360, yPosition);
+      doc.text(`$${producto.total.toFixed(2)}`, 450, yPosition);
+      yPosition += 20;
+    });
+    
+    // Línea separadora
+    yPosition += 10;
+    doc.moveTo(300, yPosition).lineTo(550, yPosition).stroke();
+    yPosition += 20;
+    
+    // Totales
+    doc.text('Subtotal:', 360, yPosition);
+    doc.text(`$${conduce.subtotal.toFixed(2)}`, 450, yPosition);
+    yPosition += 20;
+    
+    doc.text('ITBIS (18%):', 360, yPosition);
+    doc.text(`$${conduce.impuesto.toFixed(2)}`, 450, yPosition);
+    yPosition += 20;
+    
+    doc.fontSize(14).text('TOTAL:', 360, yPosition);
+    doc.text(`$${conduce.total.toFixed(2)}`, 450, yPosition);
+    
+    // Información de crédito
+    yPosition += 40;
+    doc.fontSize(10).text('DOCUMENTO DE CRÉDITO - NO ES FACTURA FISCAL', 50, yPosition);
+    yPosition += 15;
+    doc.text(`Fecha de vencimiento: ${conduce.fechaVencimiento.toLocaleDateString('es-DO')}`, 50, yPosition);
+    yPosition += 15;
+    doc.text('Para factura fiscal, solicitar agrupación de conduces al realizar el pago', 50, yPosition);
+    
+    // Footer
+    doc.fontSize(10).text('Gracias por su preferencia', 50, yPosition + 30);
+    
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Obtener conduces pendientes de un cliente para agrupar en factura
+app.get('/api/conduces/pendientes/:clienteId', async (req, res) => {
+  try {
+    const conduces = await Conduce.find({
+      cliente: req.params.clienteId,
+      estado: 'pendiente'
+    }).populate('cliente', 'nombre telefono rnc');
+    
+    res.json(conduces);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Anular conduce
+app.put('/api/conduces/:id/anular', async (req, res) => {
+  try {
+    const { motivo } = req.body;
+    const conduce = await Conduce.findById(req.params.id).populate('cliente');
+    
+    if (!conduce) {
+      return res.status(404).json({ error: 'Conduce no encontrado' });
+    }
+    
+    if (conduce.estado !== 'pendiente') {
+      return res.status(400).json({ error: 'Solo se pueden anular conduces pendientes' });
+    }
+    
+    // Actualizar conduce
+    conduce.estado = 'anulado';
+    conduce.anulado = true;
+    conduce.motivoAnulacion = motivo;
+    await conduce.save();
+    
+    // Actualizar saldo del cliente
+    const cliente = await Cliente.findById(conduce.cliente._id);
+    cliente.saldoPendiente = Math.max(0, cliente.saldoPendiente - conduce.total);
+    await cliente.save();
+    
+    res.json(conduce);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= RUTAS API PARA FACTURAS =============
+
+// Obtener facturas con filtros
+app.get('/api/facturas', async (req, res) => {
+  try {
+    const { fecha, mes, anio, cliente, rnc } = req.query;
+    let query = {};
+    
+    if (fecha) {
+      const startOfDay = new Date(fecha);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(fecha);
+      endOfDay.setHours(23, 59, 59, 999);
+      query.fechaEmision = { $gte: startOfDay, $lte: endOfDay };
+    } else if (mes && anio) {
+      const startOfMonth = new Date(anio, mes - 1, 1);
+      const endOfMonth = new Date(anio, mes, 0, 23, 59, 59, 999);
+      query.fechaEmision = { $gte: startOfMonth, $lte: endOfMonth };
+    }
+    
+    if (cliente) query.cliente = cliente;
+    if (rnc === 'true') query.rnc = { $ne: '' };
+    
+    const facturas = await Factura.find(query)
+      .populate('cliente', 'nombre telefono rnc')
+      .sort({ fechaEmision: -1 });
+    
+    res.json(facturas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear factura
+app.post('/api/facturas', async (req, res) => {
+  try {
+    console.log('📝 Solicitud de crear factura recibida:', req.body);
+    const { clienteId, productos, tipoComprobante, requiereRNC, conducesIds } = req.body;
+    
+    let productosFactura = productos || [];
+    let totalFactura = 0;
+    
+    // Si se están agrupando conduces
+    if (conducesIds && conducesIds.length > 0) {
+      console.log('💳 Procesando conduces:', conducesIds);
+      const conduces = await Conduce.find({
+        _id: { $in: conducesIds },
+        cliente: clienteId,
+        estado: 'pendiente'
+      });
+      
+      console.log(`🔍 Encontrados ${conduces.length} conduces pendientes de ${conducesIds.length} solicitados`);
+      
+      if (conduces.length !== conducesIds.length) {
+        console.log('❌ Error: algunos conduces no son válidos');
+        return res.status(400).json({ error: 'Algunos conduces no son válidos o ya están pagados' });
+      }
+      
+      // Agrupar productos de todos los conduces
+      productosFactura = [];
+      conduces.forEach(conduce => {
+        conduce.productos.forEach(producto => {
+          // Buscar si ya existe el producto en la factura
+          const existente = productosFactura.find(p => p.descripcion === producto.descripcion && p.precioUnitario === producto.precioUnitario);
+          if (existente) {
+            existente.cantidad += producto.cantidad;
+            existente.total = existente.cantidad * existente.precioUnitario;
+          } else {
+            productosFactura.push({
+              descripcion: producto.descripcion,
+              cantidad: producto.cantidad,
+              precioUnitario: producto.precioUnitario,
+              total: producto.total
+            });
+          }
+        });
+        totalFactura += conduce.total;
+      });
+    } else {
+      // Factura normal sin conduces
+      productosFactura.forEach(producto => {
+        producto.total = producto.cantidad * producto.precioUnitario;
+        totalFactura += producto.total;
+      });
+    }
+    
+    // Calcular totales finales
+    const subtotal = productosFactura.reduce((sum, p) => sum + p.total, 0);
+    const impuesto = subtotal * 0.18;
+    const total = subtotal + impuesto;
+    
+    // Generar número de factura
+    let numeroFactura = '';
+    let secuencia = '';
+    
+    if (requiereRNC && tipoComprobante === 'FACTURA') {
+      // Obtener configuración RNC activa
+      const configRNC = await ConfiguracionRNC.findOne({
+        activa: true,
+        $expr: { $lte: ["$secuenciaActual", "$secuenciaFinal"] }
+      }).sort({ fechaVencimiento: 1 });
+      
+      if (!configRNC) {
+        return res.status(400).json({ error: 'No hay secuencias RNC disponibles' });
+      }
+      
+      // Generar número con secuencia
+      const numeroSecuencia = configRNC.secuenciaActual.toString().padStart(8, '0');
+      numeroFactura = `${configRNC.prefijo}${numeroSecuencia}`;
+      secuencia = configRNC.nombre;
+      
+      // Actualizar secuencia
+      configRNC.secuenciaActual += 1;
+      await configRNC.save();
+    } else {
+      // Generar número simple para boletas
+      const count = await Factura.countDocuments();
+      numeroFactura = `${tipoComprobante}-${(count + 1).toString().padStart(6, '0')}`;
+    }
+    
+    // Obtener cliente
+    const cliente = await Cliente.findById(clienteId);
+    
+    // Permitir que el frontend envíe una fecha de emisión personalizada (por ejemplo, la fecha seleccionada en la UI)
+    let fechaEmision = req.body.fechaEmision;
+    if (fechaEmision) {
+      // Si viene como string (YYYY-MM-DD), crear objeto Date a medianoche local
+      if (typeof fechaEmision === 'string' && fechaEmision.length === 10) {
+        const [year, month, day] = fechaEmision.split('-').map(Number);
+        fechaEmision = new Date(year, month - 1, day, 0, 0, 0, 0);
+      } else {
+        fechaEmision = new Date(fechaEmision);
+      }
+    } else {
+      // Si no se envía, usar la fecha local del servidor
+      const now = new Date();
+      fechaEmision = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    }
+    const factura = new Factura({
+      numero: numeroFactura,
+      tipoComprobante,
+      cliente: clienteId,
+      productos: productosFactura,
+      subtotal,
+      impuesto,
+      total,
+      rnc: requiereRNC ? cliente.rnc : '',
+      secuencia,
+      conduces: conducesIds || [],
+      fechaEmision
+    });
+    
+    await factura.save();
+    console.log('✅ Factura creada exitosamente:', factura.numero);
+    
+    // Si hay conduces, marcarlos como pagados
+    if (conducesIds && conducesIds.length > 0) {
+      console.log('🔄 Actualizando estado de conduces...');
+      await Conduce.updateMany(
+        { _id: { $in: conducesIds } },
+        { 
+          estado: 'pagado',
+          facturaId: factura._id
+        }
+      );
+      
+      // Actualizar saldo del cliente
+      const totalConduces = await Conduce.aggregate([
+        { $match: { _id: { $in: conducesIds.map(id => new mongoose.Types.ObjectId(id)) } } },
+        { $group: { _id: null, total: { $sum: '$total' } } }
+      ]);
+      
+      if (totalConduces.length > 0) {
+        console.log('💰 Actualizando saldo del cliente:', totalConduces[0].total);
+        cliente.saldoPendiente = Math.max(0, cliente.saldoPendiente - totalConduces[0].total);
+        await cliente.save();
+      }
+    }
+    
+    await factura.populate('cliente', 'nombre telefono rnc direccion');
+    console.log('📤 Enviando factura al cliente');
+    
+    res.json(factura);
+  } catch (error) {
+    console.error('❌ Error creando factura:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generar PDF de factura
+app.get('/api/facturas/:id/pdf', async (req, res) => {
+  try {
+    const factura = await Factura.findById(req.params.id).populate('cliente');
+    
+    if (!factura) {
+      return res.status(404).json({ error: 'Factura no encontrada' });
+    }
+    
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+    
+    // Configurar response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="factura-${factura.numero}.pdf"`);
+    
+    // Pipe PDF al response
+    doc.pipe(res);
+    
+    // Header de la empresa
+    doc.fontSize(20).text('COMEDOR & DELIVERY', 50, 50);
+    doc.fontSize(12).text('Sistema de Facturación', 50, 75);
+    doc.text('RNC: 123456789', 50, 90);
+    doc.text('Dirección: Tu Dirección Aquí', 50, 105);
+    doc.text('Teléfono: (809) 123-4567', 50, 120);
+    
+    // Información de la factura
+    doc.fontSize(16).text(`${factura.tipoComprobante}`, 400, 50);
+    doc.fontSize(12).text(`No: ${factura.numero}`, 400, 75);
+    doc.text(`Fecha: ${factura.fechaEmision.toLocaleDateString('es-DO')}`, 400, 90);
+    if (factura.secuencia) {
+      doc.text(`Secuencia: ${factura.secuencia}`, 400, 105);
+    }
+    
+    // Información del cliente
+    doc.text('FACTURAR A:', 50, 160);
+    doc.text(`Cliente: ${factura.cliente.nombre}`, 50, 180);
+    doc.text(`Teléfono: ${factura.cliente.telefono}`, 50, 195);
+    if (factura.rnc) {
+      doc.text(`RNC: ${factura.rnc}`, 50, 210);
+    }
+    if (factura.cliente.direccion) {
+      doc.text(`Dirección: ${factura.cliente.direccion}`, 50, 225);
+    }
+    
+    // Tabla de productos
+    let yPosition = 260;
+    doc.text('DESCRIPCIÓN', 50, yPosition);
+    doc.text('CANT.', 300, yPosition);
+    doc.text('PRECIO', 360, yPosition);
+    doc.text('TOTAL', 450, yPosition);
+    
+    // Línea separadora
+    doc.moveTo(50, yPosition + 15).lineTo(550, yPosition + 15).stroke();
+    yPosition += 30;
+    
+    factura.productos.forEach(producto => {
+      doc.text(producto.descripcion, 50, yPosition);
+      doc.text(producto.cantidad.toString(), 300, yPosition);
+      doc.text(`$${producto.precioUnitario.toFixed(2)}`, 360, yPosition);
+      doc.text(`$${producto.total.toFixed(2)}`, 450, yPosition);
+      yPosition += 20;
+    });
+    
+    // Línea separadora
+    yPosition += 10;
+    doc.moveTo(300, yPosition).lineTo(550, yPosition).stroke();
+    yPosition += 20;
+    
+    // Totales
+    doc.text('Subtotal:', 360, yPosition);
+    doc.text(`$${factura.subtotal.toFixed(2)}`, 450, yPosition);
+    yPosition += 20;
+    
+    doc.text('ITBIS (18%):', 360, yPosition);
+    doc.text(`$${factura.impuesto.toFixed(2)}`, 450, yPosition);
+    yPosition += 20;
+    
+    doc.fontSize(14).text('TOTAL:', 360, yPosition);
+    doc.text(`$${factura.total.toFixed(2)}`, 450, yPosition);
+    
+    // Footer
+    doc.fontSize(10).text('Gracias por su preferencia', 50, yPosition + 50);
+    
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Anular factura
+app.put('/api/facturas/:id/anular', async (req, res) => {
+  try {
+    const { motivo } = req.body;
+    const factura = await Factura.findByIdAndUpdate(
+      req.params.id,
+      { anulada: true, motivoAnulacion: motivo },
+      { new: true }
+    );
+    res.json(factura);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reporte mensual de facturas con RNC
+app.get('/api/reportes/facturas-rnc', async (req, res) => {
+  try {
+    const { mes, anio } = req.query;
+    
+    if (!mes || !anio) {
+      return res.status(400).json({ error: 'Mes y año son requeridos' });
+    }
+    
+    const startOfMonth = new Date(anio, mes - 1, 1);
+    const endOfMonth = new Date(anio, mes, 0, 23, 59, 59, 999);
+    
+    const facturas = await Factura.find({
+      fechaEmision: { $gte: startOfMonth, $lte: endOfMonth },
+      rnc: { $ne: '' },
+      anulada: false
+    }).populate('cliente', 'nombre rnc').sort({ fechaEmision: 1 });
+    
+    // Generar PDF del reporte
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="reporte-rnc-${mes}-${anio}.pdf"`);
+    
+    doc.pipe(res);
+    
+    // Header
+    doc.fontSize(16).text('REPORTE MENSUAL DE FACTURAS CON RNC', 50, 50);
+    doc.fontSize(12).text(`Período: ${mes}/${anio}`, 50, 75);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-DO')}`, 50, 90);
+    
+    // Tabla
+    let yPosition = 130;
+    doc.text('FECHA', 50, yPosition);
+    doc.text('FACTURA', 120, yPosition);
+    doc.text('CLIENTE', 200, yPosition);
+    doc.text('RNC', 350, yPosition);
+    doc.text('TOTAL', 450, yPosition);
+    
+    doc.moveTo(50, yPosition + 15).lineTo(550, yPosition + 15).stroke();
+    yPosition += 25;
+    
+    let totalGeneral = 0;
+    
+    facturas.forEach(factura => {
+      const fecha = factura.fechaEmision.toLocaleDateString('es-DO');
+      doc.fontSize(10);
+      doc.text(fecha, 50, yPosition);
+      doc.text(factura.numero, 120, yPosition);
+      doc.text(factura.cliente.nombre.substring(0, 20), 200, yPosition);
+      doc.text(factura.rnc, 350, yPosition);
+      doc.text(`$${factura.total.toFixed(2)}`, 450, yPosition);
+      
+      totalGeneral += factura.total;
+      yPosition += 15;
+      
+      // Nueva página si es necesario
+      if (yPosition > 700) {
+        doc.addPage();
+        yPosition = 50;
+      }
+    });
+    
+    // Total
+    yPosition += 20;
+    doc.moveTo(350, yPosition).lineTo(550, yPosition).stroke();
+    yPosition += 15;
+    doc.fontSize(12).text('TOTAL GENERAL:', 350, yPosition);
+    doc.text(`$${totalGeneral.toFixed(2)}`, 450, yPosition);
+    
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Endpoint adicional para migración de datos (opcional)
 app.post('/api/migrate-from-sqlite', async (req, res) => {
