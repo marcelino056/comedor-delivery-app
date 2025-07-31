@@ -1,6 +1,6 @@
-# 🍽️ Comedor & Delivery App - MongoDB Edition
+# 🍽️ Comedor & Delivery App
 
-Sistema de gestión completo para comedores con servicio de delivery. PWA (Progressive Web App) con sincronización en tiempo real y funcionamiento offline. **Ahora con MongoDB como base de datos.**
+Sistema de gestión completo para comedores con servicio de delivery. PWA (Progressive Web App) con sincronización en tiempo real y funcionamiento offline.
 
 ## ✨ Características
 
@@ -27,7 +27,7 @@ Sistema de gestión completo para comedores con servicio de delivery. PWA (Progr
 
 ### Requisitos Previos
 - Node.js 18+
-- MongoDB 7.0+
+- SQLite3
 - Nginx (opcional, para producción)
 - PM2 (opcional, para producción)
 
@@ -40,31 +40,15 @@ cd comedor-delivery-app
 # Instalar dependencias
 npm install
 
-# Asegurar que MongoDB esté corriendo
-sudo systemctl start mongod
-
 # Ejecutar en desarrollo
 npm start
 ```
 
-La aplicación estará disponible en `http://localhost:3005`
+La aplicación estará disponible en `http://localhost:3000`
 
 ### Despliegue en Producción
 
-#### 1. Instalar MongoDB
-```bash
-# Ubuntu/Debian
-curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt update
-sudo apt install -y mongodb-org
-
-# Iniciar y habilitar MongoDB
-sudo systemctl start mongod
-sudo systemctl enable mongod
-```
-
-#### 2. Preparar aplicación
+#### 1. Preparar aplicación
 ```bash
 # Instalar dependencias de producción
 npm install --production
@@ -75,14 +59,14 @@ pm2 save
 pm2 startup
 ```
 
-#### 3. Configurar Nginx (opcional)
+#### 2. Configurar Nginx (opcional)
 ```nginx
 server {
     listen 80;
     server_name tu-dominio.com;
     
     location / {
-        proxy_pass http://localhost:3005;
+        proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -92,26 +76,11 @@ server {
     
     # Configuración para archivos estáticos
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        proxy_pass http://localhost:3005;
+        proxy_pass http://localhost:3000;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 }
-```
-
-## 📊 Migración desde SQLite
-
-Si tienes datos existentes en SQLite, incluimos un script de migración:
-
-```bash
-# Instalar sqlite3 temporalmente (solo para migración)
-npm install sqlite3
-
-# Ejecutar migración
-node migrate-sqlite-to-mongodb.js
-
-# Desinstalar sqlite3 (opcional)
-npm uninstall sqlite3
 ```
 
 ## 📖 Uso
@@ -131,7 +100,7 @@ npm uninstall sqlite3
 
 ### Backend
 - **Node.js** + Express.js
-- **MongoDB** + Mongoose para persistencia
+- **SQLite** para persistencia
 - **WebSocket** para tiempo real
 - **CORS** habilitado
 
@@ -144,7 +113,7 @@ npm uninstall sqlite3
 ### Infraestructura
 - **PM2** para gestión de procesos
 - **Nginx** como proxy reverso
-- **MongoDB** como base de datos NoSQL
+- **SQLite** para base de datos
 
 ## 📊 API Endpoints
 
@@ -168,63 +137,33 @@ npm uninstall sqlite3
 - `GET /api/monto-inicial/:fecha` - Obtener monto inicial
 - `POST /api/monto-inicial` - Establecer monto inicial
 
-### Migración
-- `POST /api/migrate-from-sqlite` - Migrar datos desde SQLite
-
 ## 🔧 Configuración
 
 ### Variables de Entorno
 ```env
-PORT=3005
+PORT=3000
 NODE_ENV=production
-MONGODB_URI=mongodb://127.0.0.1:27017/comedor_delivery
+DB_PATH=./comedor.db
 ```
-
-### Estructura de Base de Datos
-
-#### Colecciones MongoDB
-- **ventas**: Registro de ventas locales
-- **ordenes**: Pedidos de delivery
-- **gastos**: Gastos del negocio
-- **montoinicials**: Montos iniciales por día
 
 ### Estructura de Archivos
 ```
 comedor-delivery-app/
-├── server.js                    # Servidor principal (MongoDB)
-├── server-sqlite.js.bak         # Backup del servidor SQLite
-├── migrate-sqlite-to-mongodb.js # Script de migración
-├── package.json                 # Dependencias (MongoDB)
-├── public/                      # Frontend (sin cambios)
-│   ├── index.html              # Página principal
-│   ├── style.css               # Estilos
-│   ├── app.js                  # Lógica frontend
-│   ├── manifest.json           # PWA manifest
-│   └── sw.js                   # Service Worker
-├── comedor.db                  # Base de datos SQLite (backup)
-└── README.md                   # Este archivo
+├── server.js              # Servidor principal
+├── package.json           # Dependencias
+├── public/                # Frontend
+│   ├── index.html         # Página principal
+│   ├── style.css          # Estilos
+│   ├── app.js             # Lógica frontend
+│   ├── manifest.json      # PWA manifest
+│   └── sw.js              # Service Worker
+├── comedor.db             # Base de datos SQLite
+└── README.md              # Este archivo
 ```
-
-## 🔄 Cambios en esta Versión
-
-### Migración a MongoDB
-- ✅ Reemplazado SQLite con MongoDB + Mongoose
-- ✅ Mantenida compatibilidad total con frontend
-- ✅ Script de migración automática incluido
-- ✅ Mejor escalabilidad y rendimiento
-- ✅ Esquemas con validación de datos
-- ✅ Soporte para réplicas y clustering (futuro)
-
-### Beneficios de MongoDB
-- **Escalabilidad**: Soporte nativo para clustering
-- **Flexibilidad**: Esquemas adaptables sin migraciones
-- **Rendimiento**: Mejor para consultas complejas
-- **Herramientas**: MongoDB Compass, Atlas, etc.
-- **Documentos**: Estructura más natural para JavaScript
 
 ## 📱 Screenshots
 
-*Las capturas de pantalla siguen siendo idénticas ya que el frontend no cambió*
+*Próximamente: capturas de pantalla de la aplicación*
 
 ## 🤝 Contribuir
 
@@ -240,15 +179,12 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## 🎯 Roadmap
 
-- [x] Migración a MongoDB
-- [ ] Índices optimizados para consultas
-- [ ] Agregaciones para reportes avanzados
 - [ ] Sistema de usuarios y roles
+- [ ] Reportes avanzados con gráficos
 - [ ] Notificaciones push
 - [ ] Integración con impresoras térmicas
 - [ ] App móvil nativa
 - [ ] Integración con sistemas de pago
-- [ ] MongoDB Atlas (cloud)
 
 ## 📞 Soporte
 
@@ -259,4 +195,3 @@ Para soporte o preguntas:
 ---
 
 **Desarrollado con ❤️ para la industria gastronómica**
-**Ahora potenciado por MongoDB 🍃**
