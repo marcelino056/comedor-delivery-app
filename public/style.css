@@ -816,6 +816,331 @@ body {
     100% { transform: rotate(360deg); }
 }
 
+/* Panel de Nueva Venta */
+
+/* Panel de Nueva Venta */
+.nueva-venta-panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.venta-display {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 2px solid #e2e8f0;
+}
+
+.venta-display-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.venta-display-amount {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    font-family: 'Courier New', monospace;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Botones de Montos Rápidos */
+.quick-amounts {
+    margin-bottom: 2rem;
+}
+
+.quick-amounts-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.quick-amounts-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.quick-amount-btn {
+    padding: 0.75rem 0.5rem;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quick-amount-btn:hover {
+    background: #f1f5f9;
+    border-color: #3b82f6;
+    color: #1e40af;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.quick-amount-btn:active {
+    transform: translateY(0);
+    background: #e2e8f0;
+}
+
+/* Teclado Numérico */
+.numeric-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.keypad-btn {
+    aspect-ratio: 1;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    border-radius: 8px;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+}
+
+.keypad-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+}
+
+.keypad-btn:active {
+    transform: translateY(0);
+    background: #e2e8f0;
+}
+
+.keypad-btn.keypad-clear {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+.keypad-btn.keypad-clear:hover {
+    background: #fecaca;
+    border-color: #f87171;
+}
+
+.keypad-btn.keypad-delete {
+    background: #fef3c7;
+    border-color: #fde68a;
+    color: #d97706;
+}
+
+.keypad-btn.keypad-delete:hover {
+    background: #fde68a;
+    border-color: #fbbf24;
+}
+
+/* Métodos de Pago */
+.payment-methods-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.payment-method-btn {
+    padding: 1.5rem 1rem;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 100px;
+}
+
+.payment-method-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.payment-method-btn:active {
+    transform: translateY(0);
+}
+
+.payment-method-btn.efectivo {
+    border-color: #22c55e;
+    background: #f0fdf4;
+}
+
+.payment-method-btn.efectivo:hover {
+    background: #dcfce7;
+    border-color: #16a34a;
+}
+
+.payment-method-btn.tarjeta {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.payment-method-btn.tarjeta:hover {
+    background: #dbeafe;
+    border-color: #2563eb;
+}
+
+.payment-method-btn.transferencia {
+    border-color: #8b5cf6;
+    background: #faf5ff;
+}
+
+.payment-method-btn.transferencia:hover {
+    background: #f3e8ff;
+    border-color: #7c3aed;
+}
+
+.payment-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.payment-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.payment-method-btn.efectivo .payment-label {
+    color: #16a34a;
+}
+
+.payment-method-btn.tarjeta .payment-label {
+    color: #2563eb;
+}
+
+.payment-method-btn.transferencia .payment-label {
+    color: #7c3aed;
+}
+
+/* Historial de Ventas */
+.historial-ventas {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.historial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.historial-header h3 {
+    color: #1f2937;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.btn-close {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 0.5rem;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 1rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-close:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+/* Responsive para panel de ventas */
+@media (max-width: 640px) {
+    .nueva-venta-panel {
+        padding: 1rem;
+    }
+    
+    .venta-display-amount {
+        font-size: 2rem;
+    }
+    
+    .quick-amounts-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.4rem;
+    }
+    
+    .quick-amount-btn {
+        padding: 0.6rem 0.4rem;
+        font-size: 0.75rem;
+        min-height: 45px;
+    }
+    
+    .numeric-keypad {
+        gap: 0.5rem;
+    }
+    
+    .keypad-btn {
+        min-height: 50px;
+        font-size: 1.25rem;
+    }
+    
+    .payment-methods-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
+    .payment-method-btn {
+        padding: 1rem;
+        min-height: 80px;
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .payment-icon {
+        font-size: 1.5rem;
+    }
+    
+    .payment-label {
+        font-size: 0.75rem;
+    }
+}
+
 /* Utility classes */
 .hidden {
     display: none !important;

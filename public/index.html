@@ -41,11 +41,79 @@
             <div id="ventas-tab" class="tab-content active">
                 <div class="tab-header">
                     <h2>Ventas Locales</h2>
-                    <button class="btn-primary" onclick="openModal('venta')">
-                        <span class="icon">➕</span>
+                    <button class="btn-secondary" onclick="toggleHistorialVentas()">
+                        <span class="icon">📋</span>
+                        <span>Historial</span>
                     </button>
                 </div>
-                <div id="ventas-list" class="items-list"></div>
+                
+                <!-- Panel de Nueva Venta -->
+                <div id="nueva-venta-panel" class="nueva-venta-panel">
+                    <div class="venta-display">
+                        <div class="venta-display-label">Monto de la Venta</div>
+                        <div class="venta-display-amount" id="venta-display-amount">$0</div>
+                    </div>
+                    
+                    <!-- Botones de Montos Rápidos -->
+                    <div class="quick-amounts">
+                        <div class="quick-amounts-label">Montos Rápidos</div>
+                        <div class="quick-amounts-grid">
+                            <button class="quick-amount-btn" onclick="establecerMonto(10)">$10</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(25)">$25</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(50)">$50</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(100)">$100</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(150)">$150</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(175)">$170</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(200)">$200</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(225)">$225</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(250)">$250</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(300)">$300</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(500)">$500</button>
+                            <button class="quick-amount-btn" onclick="establecerMonto(1000)">$1000</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Teclado Numérico -->
+                    <div class="numeric-keypad">
+                        <button class="keypad-btn" onclick="agregarDigito('1')">1</button>
+                        <button class="keypad-btn" onclick="agregarDigito('2')">2</button>
+                        <button class="keypad-btn" onclick="agregarDigito('3')">3</button>
+                        <button class="keypad-btn" onclick="agregarDigito('4')">4</button>
+                        <button class="keypad-btn" onclick="agregarDigito('5')">5</button>
+                        <button class="keypad-btn" onclick="agregarDigito('6')">6</button>
+                        <button class="keypad-btn" onclick="agregarDigito('7')">7</button>
+                        <button class="keypad-btn" onclick="agregarDigito('8')">8</button>
+                        <button class="keypad-btn" onclick="agregarDigito('9')">9</button>
+                        <button class="keypad-btn keypad-clear" onclick="limpiarMonto()">C</button>
+                        <button class="keypad-btn" onclick="agregarDigito('0')">0</button>
+                        <button class="keypad-btn keypad-delete" onclick="borrarDigito()">⌫</button>
+                    </div>
+                    
+                    <!-- Métodos de Pago -->
+                    <div class="payment-methods-grid">
+                        <button class="payment-method-btn efectivo" onclick="procesarVenta('efectivo')">
+                            <span class="payment-icon">💵</span>
+                            <span class="payment-label">EFECTIVO</span>
+                        </button>
+                        <button class="payment-method-btn tarjeta" onclick="procesarVenta('tarjeta')">
+                            <span class="payment-icon">💳</span>
+                            <span class="payment-label">TARJETA</span>
+                        </button>
+                        <button class="payment-method-btn transferencia" onclick="procesarVenta('transferencia')">
+                            <span class="payment-icon">🏦</span>
+                            <span class="payment-label">TRANSFERENCIA</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Historial de Ventas -->
+                <div id="historial-ventas" class="historial-ventas hidden">
+                    <div class="historial-header">
+                        <h3>Historial del Día</h3>
+                        <button class="btn-close" onclick="toggleHistorialVentas()">✕</button>
+                    </div>
+                    <div id="ventas-list" class="items-list"></div>
+                </div>
             </div>
 
             <!-- Órdenes Tab -->

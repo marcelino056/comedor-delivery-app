@@ -6,7 +6,9 @@ let state = {
     montoInicial: {},
     activeTab: 'ventas',
     filtroEstado: 'todos',
-    ws: null
+    ws: null,
+    ventaActual: 0,
+    historialVisible: false
 };
 
 // Configuración
@@ -634,6 +636,9 @@ function updateAllViews() {
     updateVentasView();
     updateOrdenesView(); 
     updateCajaView();
+    
+    // Inicializar el display de venta
+    actualizarDisplayVenta();
 }
 
 function updateVentasView() {
@@ -977,6 +982,116 @@ function showLoading(show) {
     }
 }
 
+// Funciones del panel de ventas
+function agregarDigito(digito) {
+    const montoStr = state.ventaActual.toString();
+    if (montoStr.length < 8) { // Máximo 8 dígitos
+        state.ventaActual = parseInt(montoStr + digito) || 0;
+        actualizarDisplayVenta();
+    }
+}
+
+function borrarDigito() {
+    const montoStr = state.ventaActual.toString();
+    if (montoStr.length > 1) {
+        state.ventaActual = parseInt(montoStr.slice(0, -1)) || 0;
+    } else {
+        state.ventaActual = 0;
+    }
+    actualizarDisplayVenta();
+}
+
+function limpiarMonto() {
+    state.ventaActual = 0;
+    actualizarDisplayVenta();
+}
+
+function establecerMonto(monto) {
+    state.ventaActual = monto;
+    actualizarDisplayVenta();
+}
+
+function actualizarDisplayVenta() {
+    const display = document.getElementById('venta-display-amount');
+    if (display) {
+        display.textContent = formatCurrency(state.ventaActual);
+    }
+}
+
+async function procesarVenta(metodoPago) {
+    if (state.ventaActual <= 0) {
+        alert('Por favor ingresa un monto válido');
+        return;
+    }
+
+    showLoading(true);
+    try {
+        const response = await fetch(`${API_BASE}/ventas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                monto: state.ventaActual,
+                metodoPago,
+                timestamp: new Date().toISOString()
+            })
+        });
+
+        if (response.ok) {
+            // Limpiar el monto después de registrar la venta
+            limpiarMonto();
+            // El WebSocket se encargará de actualizar la vista
+            
+            // Mostrar mensaje de éxito
+            const metodosMap = {
+                'efectivo': 'EFECTIVO',
+                'tarjeta': 'TARJETA', 
+                'transferencia': 'TRANSFERENCIA'
+            };
+            
+            // Feedback visual temporal
+            mostrarFeedbackVenta(metodosMap[metodoPago]);
+        } else {
+            throw new Error('Error al registrar venta');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al registrar la venta');
+    } finally {
+        showLoading(false);
+    }
+}
+
+function mostrarFeedbackVenta(metodo) {
+    const display = document.getElementById('venta-display-amount');
+    if (display) {
+        const originalText = display.textContent;
+        const originalColor = display.style.color;
+        
+        display.textContent = `✓ ${metodo}`;
+        display.style.color = '#16a34a';
+        
+        setTimeout(() => {
+            display.textContent = originalText;
+            display.style.color = originalColor;
+        }, 1500);
+    }
+}
+
+function toggleHistorialVentas() {
+    state.historialVisible = !state.historialVisible;
+    const panel = document.getElementById('nueva-venta-panel');
+    const historial = document.getElementById('historial-ventas');
+    
+    if (state.historialVisible) {
+        panel.classList.add('hidden');
+        historial.classList.remove('hidden');
+        updateVentasView(); // Actualizar la lista de ventas
+    } else {
+        panel.classList.remove('hidden');
+        historial.classList.add('hidden');
+    }
+}
+
 // Funciones globales para eventos onclick
 window.openModal = openModal;
 window.closeModal = closeModal;
@@ -988,4 +1103,10 @@ window.anularVenta = anularVenta;
 window.anularOrden = anularOrden;
 window.cambiarEstadoOrden = cambiarEstadoOrden;
 window.cambiarMetodoPagoOrden = cambiarMetodoPagoOrden;
+window.agregarDigito = agregarDigito;
+window.borrarDigito = borrarDigito;
+window.limpiarMonto = limpiarMonto;
+window.establecerMonto = establecerMonto;
+window.procesarVenta = procesarVenta;
+window.toggleHistorialVentas = toggleHistorialVentas;
 window.setFilter = setFilter;
