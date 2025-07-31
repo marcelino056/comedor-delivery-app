@@ -240,6 +240,12 @@ function handleWebSocketMessage(message) {
             state.montoInicial[message.data.fecha] = message.data.monto;
             updateCajaView();
             break;
+        case 'nuevo_conduce':
+            state.conduces.unshift(message.data);
+            updateCreditosSummary(state.conduces);
+            renderConducesList(state.conduces);
+            updateClientFilters(state.clientes);
+            break;
     }
 }
 
