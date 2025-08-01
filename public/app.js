@@ -422,13 +422,41 @@ function openModal(type) {
             // Asegurar que el modal esté visible antes de configurar
             modal.style.display = 'block';
             modal.classList.add('show');
-            // Configurar el modal después de que el DOM esté listo
+            // Cargar clientes directamente aquí
             setTimeout(async () => {
-                // Verificar que el modal sigue abierto
-                if (modal.style.display === 'block') {
-                    await setupConduceModal();
+                console.log('[MODAL] Configurando conduce modal - verificando elementos...');
+                const clienteSelect = document.getElementById('conduce-cliente');
+                console.log('[MODAL] Elemento conduce-cliente encontrado:', !!clienteSelect);
+                
+                if (clienteSelect && modal.style.display === 'block') {
+                    try {
+                        console.log('[MODAL] Cargando clientes...');
+                        if (!state.clientes || state.clientes.length === 0) {
+                            const response = await fetch(`${API_BASE}/clientes`);
+                            if (response.ok) {
+                                state.clientes = await response.json();
+                                console.log('[MODAL] Clientes cargados:', state.clientes.length);
+                            }
+                        }
+                        
+                        if (state.clientes && state.clientes.length > 0) {
+                            const opciones = ['<option value="">Seleccione un cliente</option>'];
+                            state.clientes.forEach(cliente => {
+                                const credito = cliente.creditoHabilitado ? ' ✅' : ' ❌';
+                                opciones.push(`<option value="${cliente._id}">${cliente.nombre}${credito}</option>`);
+                            });
+                            clienteSelect.innerHTML = opciones.join('');
+                            console.log('[MODAL] ✅ Clientes cargados en select exitosamente');
+                        } else {
+                            clienteSelect.innerHTML = '<option value="">No hay clientes disponibles</option>';
+                            console.warn('[MODAL] No hay clientes disponibles');
+                        }
+                    } catch (error) {
+                        console.error('[MODAL] Error cargando clientes:', error);
+                        clienteSelect.innerHTML = '<option value="">Error cargando clientes</option>';
+                    }
                 }
-            }, 250);
+            }, 500);
             break;
         case 'pagar-creditos':
             title.textContent = 'Pagar Créditos';
@@ -436,13 +464,39 @@ function openModal(type) {
             // Asegurar que el modal esté visible antes de configurar
             modal.style.display = 'block';
             modal.classList.add('show');
-            // Configurar el modal después de que el DOM esté listo
+            // Cargar clientes directamente aquí también
             setTimeout(async () => {
-                // Verificar que el modal sigue abierto
-                if (modal.style.display === 'block') {
-                    await setupPagarCreditosModal();
+                console.log('[MODAL] Configurando pagar créditos modal...');
+                const clienteSelect = document.getElementById('pago-cliente');
+                console.log('[MODAL] Elemento pago-cliente encontrado:', !!clienteSelect);
+                
+                if (clienteSelect && modal.style.display === 'block') {
+                    try {
+                        if (!state.clientes || state.clientes.length === 0) {
+                            const response = await fetch(`${API_BASE}/clientes`);
+                            if (response.ok) {
+                                state.clientes = await response.json();
+                            }
+                        }
+                        
+                        if (state.clientes && state.clientes.length > 0) {
+                            const opciones = ['<option value="">Seleccione un cliente</option>'];
+                            state.clientes.forEach(cliente => {
+                                const credito = cliente.creditoHabilitado ? ' ✅' : ' ❌';
+                                const saldo = cliente.saldoPendiente || 0;
+                                opciones.push(`<option value="${cliente._id}">${cliente.nombre}${credito} - Saldo: $${saldo.toFixed(2)}</option>`);
+                            });
+                            clienteSelect.innerHTML = opciones.join('');
+                            console.log('[MODAL] ✅ Clientes cargados en modal pago');
+                        } else {
+                            clienteSelect.innerHTML = '<option value="">No hay clientes disponibles</option>';
+                        }
+                    } catch (error) {
+                        console.error('[MODAL] Error cargando clientes para pago:', error);
+                        clienteSelect.innerHTML = '<option value="">Error cargando clientes</option>';
+                    }
                 }
-            }, 250);
+            }, 500);
             break;
         case 'configuracion-empresa':
             title.textContent = 'Configuración de la Empresa';
