@@ -1,4 +1,5 @@
 // Función helper para obtener fecha local en formato YYYY-MM-DD
+// Última actualización: 2025-08-01 18:30 - Fix modal conduces
 function getLocalDateString(date = new Date()) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
