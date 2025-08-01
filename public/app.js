@@ -3102,7 +3102,9 @@ async function guardarConfiguracionEmpresa() {
         });
 
         if (!response.ok) {
-            throw new Error('Error al guardar configuración');
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.error || `Error ${response.status}: ${response.statusText}`;
+            throw new Error(errorMessage);
         }
 
         const configActualizada = await response.json();
@@ -3116,7 +3118,12 @@ async function guardarConfiguracionEmpresa() {
 
     } catch (error) {
         console.error('Error guardando configuración de empresa:', error);
-        showNotification('Error al guardar la configuración', 'error');
+        console.error('Detalles del error:', {
+            message: error.message,
+            stack: error.stack,
+            formData: formData
+        });
+        showNotification(`Error al guardar: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }

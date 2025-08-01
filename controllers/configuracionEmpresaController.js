@@ -25,6 +25,7 @@ module.exports = {
   async update(req, res) {
     try {
       console.log('[CONFIG-EMPRESA] Actualizando configuración:', req.body);
+      console.log('[CONFIG-EMPRESA] Headers:', req.headers);
       const { nombre, direccion, telefono, rnc, logo } = req.body;
       
       let config = await ConfiguracionEmpresa.findOne();
@@ -48,18 +49,20 @@ module.exports = {
         config.fechaActualizacion = new Date();
       }
       
-      await config.save();
+      console.log('[CONFIG-EMPRESA] Datos a guardar:', config.toObject());
+      const savedConfig = await config.save();
+      console.log('[CONFIG-EMPRESA] Configuración guardada:', savedConfig.toObject());
       
       // Emitir por WebSocket si está disponible
       if (global.broadcast) {
         global.broadcast({ 
           type: 'configuracion_empresa_actualizada', 
-          data: config 
+          data: savedConfig 
         });
       }
       
       console.log('[CONFIG-EMPRESA] Configuración actualizada exitosamente');
-      res.json(config);
+      res.json(savedConfig);
     } catch (error) {
       console.error('[CONFIG-EMPRESA][ERROR] al actualizar:', error);
       res.status(500).json({ error: error.message });

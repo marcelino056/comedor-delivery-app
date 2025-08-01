@@ -31,6 +31,6 @@ const configuracionEmpresaSchema = new mongoose.Schema({
 });
 
 // Solo permitir un documento de configuración
-configuracionEmpresaSchema.index({ _id: 1 }, { unique: true });
+// Note: _id is automatically indexed by MongoDB, no need to define it explicitly
 
 module.exports = mongoose.model('ConfiguracionEmpresa', configuracionEmpresaSchema);
