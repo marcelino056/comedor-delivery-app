@@ -3,10 +3,45 @@ name: Deploy to Amber VPS
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
-j          sudo pm2 start ecosystem.config.js
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.VPS_PORT }}
+        script: |
+          echo "🚀 Iniciando deployment..."
+          
+          # Navegar al directorio de la aplicación
+          cd /var/www/comedor-app
+          
+          # Hacer backup del estado actual
+          echo "📦 Haciendo backup..."
+          sudo cp -r /var/www/comedor-app /var/www/comedor-app-backup-$(date +%Y%m%d-%H%M%S)
+          
+          # Actualizar código
+          echo "⬇️ Actualizando código..."
+          sudo git fetch origin
+          sudo git reset --hard origin/main
+          
+          # Instalar dependencias si es necesario
+          echo "📦 Instalando dependencias..."
+          sudo npm ci --production
+          
+          # Reiniciar aplicación con PM2
+          echo "🔄 Reiniciando aplicación..."
+          sudo pm2 stop comedor-app || true
+          sudo pm2 start ecosystem.config.js
           sudo pm2 save
           
           # Verificar que la aplicación responda
@@ -17,132 +52,5 @@ j          sudo pm2 start ecosystem.config.js
             echo "❌ Error: La aplicación no responde en puerto 3007"
             exit 1
           fi
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run tests (if available)
-      run: npm test --if-present
-
-    - name: Deploy to Amber VPS
-      if: github.ref == 'refs/heads/main'
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USER }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        port: ${{ secrets.VPS_PORT || 22 }}
-        script: |
-          echo "🚀 Iniciando deployment..."
           
-          # Navegar al directorio del proyecto
-          cd /var/www/comedor-app || {
-            echo "❌ Error: Directorio del proyecto no encontrado"
-            exit 1
-          }
-          
-          echo "📂 Directorio actual: $(pwd)"
-          
-          # Hacer backup de la configuración actual
-          echo "📦 Creando backup..."
-          sudo cp -r . /var/www/backups/comedor-app-$(date +%Y%m%d-%H%M%S) || echo "⚠️  Warning: No se pudo crear backup"
-          
-          # Detener la aplicación PM2
-          echo "⏹️  Deteniendo aplicación..."
-          sudo pm2 stop comedor-app || echo "⚠️  Aplicación no estaba corriendo"
-          
-          # Actualizar código desde GitHub
-          echo "📥 Actualizando código desde GitHub..."
-          sudo git fetch origin
-          sudo git reset --hard origin/main
-          sudo chown -R www-data:www-data .
-          
-          # Instalar dependencias
-          echo "📦 Instalando dependencias..."
-          sudo npm ci --production
-          
-          # Verificar configuración
-          echo "🔍 Verificando archivos importantes..."
-          [ -f "server.js" ] && echo "✅ server.js encontrado" || echo "❌ server.js NO encontrado"
-          [ -f "package.json" ] && echo "✅ package.json encontrado" || echo "❌ package.json NO encontrado"
-          
-          # Verificar MongoDB está corriendo
-          echo "🔍 Verificando MongoDB..."
-          sudo systemctl is-active mongod && echo "✅ MongoDB está corriendo" || {
-            echo "⚠️  MongoDB no está corriendo, intentando iniciar..."
-            sudo systemctl start mongod
-          }
-          
-          # Crear/actualizar configuración de PM2
-          echo "� Actualizando configuración de PM2..."
-          cat > ecosystem.config.js << 'EOF'
-module.exports = {
-  apps: [{
-    name: 'comedor-app',
-    script: './server.js',
-    cwd: '/var/www/comedor-app',
-    instances: 1,
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3005
-    },
-    error_file: '/var/log/pm2/comedor-app-error.log',
-    out_file: '/var/log/pm2/comedor-app-out.log',
-    log_file: '/var/log/pm2/comedor-app.log',
-    time: true,
-    watch: false,
-    restart_delay: 5000,
-    max_restarts: 10
-  }]
-};
-EOF
-          
-          # Reiniciar la aplicación con PM2
-          echo "🔄 Reiniciando aplicación..."
-          sudo pm2 start ecosystem.config.js || sudo pm2 restart comedor-app
-          sudo pm2 save
-          
-          # Verificar que la aplicación esté corriendo
-          sleep 5
-          if sudo pm2 show comedor-app | grep -q "online"; then
-            echo "✅ Aplicación reiniciada correctamente"
-            echo "🌐 Aplicación disponible en el puerto 3005"
-          else
-            echo "❌ Error: La aplicación no se pudo iniciar"
-            echo "📋 Logs de la aplicación:"
-            sudo pm2 logs comedor-app --lines 20
-            exit 1
-          fi
-          
-          # Verificar conectividad
-          echo "🔍 Verificando conectividad..."
-          sleep 5
-          if curl -f http://localhost:3005 > /dev/null 2>&1; then
-            echo "✅ Aplicación responde correctamente"
-          else
-            echo "⚠️  Warning: La aplicación puede no estar respondiendo aún"
-          fi
-          
-          echo "🎉 ¡Deployment completado exitosamente!"
-          echo "📊 Estado de la aplicación:"
-          sudo pm2 status
-
-    - name: Notify deployment status
-      if: always()
-      run: |
-        if [ "${{ job.status }}" == "success" ]; then
-          echo "✅ Deployment exitoso a Amber VPS"
-        else
-          echo "❌ Deployment falló"
-        fi
+          echo "🎉 Deployment completado exitosamente!"
