@@ -1,0 +1,23 @@
+[Unit]
+Description=Comedor Delivery App
+After=network.target mongod.service
+Wants=mongod.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/comedor-delivery-app
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=PORT=3005
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=comedor-delivery-app
+
+# Límites de recursos
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

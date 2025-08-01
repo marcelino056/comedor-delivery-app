@@ -912,11 +912,21 @@ body {
     padding: 1rem;
     opacity: 1;
     transition: opacity 0.3s ease;
+    /* Asegurar centrado en todos los navegadores */
+    -webkit-align-items: center;
+    -webkit-justify-content: center;
+}
+
+.modal.show {
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
 }
 
 .modal.hidden {
-    opacity: 0;
-    pointer-events: none;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    display: none !important;
 }
 
 .modal-content {
@@ -929,6 +939,9 @@ body {
     transform: scale(1);
     transition: transform 0.3s ease;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    /* Asegurar que se mantenga centrado */
+    margin: auto;
+    position: relative;
 }
 
 .modal.hidden .modal-content {

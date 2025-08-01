@@ -263,6 +263,16 @@ function handleWebSocketMessage(message) {
             renderConducesList(state.conduces);
             updateClientFilters(state.clientes);
             break;
+        case 'cliente_actualizado':
+        case 'nuevo_cliente':
+            console.log('[WEBSOCKET] Cliente actualizado, recargando clientes...');
+            // Recargar clientes y actualizar modales si están abiertos
+            cargarClientes().then(() => {
+                updateClientFilters(state.clientes);
+                // Si hay modales abiertos que dependen de clientes, actualizarlos
+                refreshOpenModals();
+            });
+            break;
         case 'nueva_factura':
             console.log('[WEBSOCKET] Nueva factura recibida, recargando datos...');
             // Actualizar facturas
@@ -341,6 +351,28 @@ function setFilter(filter) {
     updateOrdenesView();
 }
 
+// Refrescar modales abiertos cuando cambian los datos
+function refreshOpenModals() {
+    const modal = document.getElementById('modal');
+    if (!modal || modal.classList.contains('hidden')) {
+        return; // No hay modal abierto
+    }
+    
+    const title = document.getElementById('modal-title').textContent;
+    
+    // Refrescar según el tipo de modal abierto
+    if (title.includes('Conduce')) {
+        console.log('Refrescando modal de conduce...');
+        setupConduceModal();
+    } else if (title.includes('Pagar Créditos')) {
+        console.log('Refrescando modal de pagar créditos...');
+        setupPagarCreditosModal();
+    } else if (title.includes('Factura')) {
+        console.log('Refrescando modal de factura...');
+        setupFacturaModal();
+    }
+}
+
 // Modales
 function openModal(type) {
     const modal = document.getElementById('modal');
@@ -385,25 +417,30 @@ function openModal(type) {
         case 'conduce':
             title.textContent = 'Nuevo Conduce a Crédito';
             body.innerHTML = getTemplateContent('template-conduce-modal');
-            setTimeout(() => {
-                console.log('Configurando modal de conduce...');
-                setupConduceModal();
-            }, 100);
+            // Asegurar que el modal esté visible antes de configurar
+            modal.style.display = 'block';
+            modal.classList.add('show');
+            // Configurar el modal después de que el DOM esté listo
+            setTimeout(async () => {
+                // Verificar que el modal sigue abierto
+                if (modal.style.display === 'block') {
+                    await setupConduceModal();
+                }
+            }, 250);
             break;
         case 'pagar-creditos':
             title.textContent = 'Pagar Créditos';
             body.innerHTML = getTemplateContent('template-pagar-creditos-modal');
-            // Forzar rebinding inmediato del evento y feedback
-            setTimeout(() => {
-                setupPagarCreditosModal();
-                // Forzar feedback visual y habilitar botón
-                const btn = document.getElementById('btn-pagar-creditos');
-                if (btn) btn.disabled = true;
-                const form = document.getElementById('pagar-creditos-form');
-                if (form) {
-                    form.onsubmit = pagarCreditos;
+            // Asegurar que el modal esté visible antes de configurar
+            modal.style.display = 'block';
+            modal.classList.add('show');
+            // Configurar el modal después de que el DOM esté listo
+            setTimeout(async () => {
+                // Verificar que el modal sigue abierto
+                if (modal.style.display === 'block') {
+                    await setupPagarCreditosModal();
                 }
-            }, 50);
+            }, 250);
             break;
         case 'configuracion-empresa':
             title.textContent = 'Configuración de la Empresa';
@@ -412,7 +449,10 @@ function openModal(type) {
             break;
     }
 
+    // Asegurar que el modal se muestre correctamente
+    modal.style.display = 'block';
     modal.classList.remove('hidden');
+    modal.classList.add('show');
 }
 
 function getTemplateContent(templateId) {
@@ -438,7 +478,17 @@ function setupFacturaModal() {
 }
 
 function closeModal() {
-    document.getElementById('modal').classList.add('hidden');
+    console.log('closeModal ejecutándose...');
+    const modal = document.getElementById('modal');
+    console.log('Modal encontrado:', !!modal);
+    console.log('Clases antes del cierre:', modal?.classList.toString());
+    
+    modal.classList.add('hidden');
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    
+    console.log('Clases después del cierre:', modal?.classList.toString());
+    console.log('Display después del cierre:', modal?.style.display);
 }
 
 function getVentaModalContent() {
@@ -1624,11 +1674,28 @@ async function generarReporteDiario() {
 
 async function cargarClientes() {
     try {
+        console.log('Cargando clientes desde API...');
         const response = await fetch(`${API_BASE}/clientes`);
-        state.clientes = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const clientes = await response.json();
+        console.log('Clientes recibidos del servidor:', clientes.length);
+        
+        state.clientes = clientes;
         updateClientesView();
+        
+        // Log de clientes con crédito para debug
+        const clientesConCredito = clientes.filter(c => c.creditoHabilitado);
+        console.log('Clientes con crédito habilitado:', clientesConCredito.length, clientesConCredito.map(c => c.nombre));
+        
     } catch (error) {
         console.error('Error cargando clientes:', error);
+        showNotification('Error al cargar clientes: ' + error.message, 'error');
+        // Asegurar que state.clientes es un array vacío en caso de error
+        state.clientes = [];
     }
 }
 
@@ -2846,28 +2913,35 @@ async function anularConduce(conduceId) {
 // Configurar modal de conduce
 async function setupConduceModal() {
     try {
-        console.log('Iniciando configuración de modal de conduce...');
-        console.log('Estado actual de clientes:', state.clientes?.length || 0);
-        
         // Asegurar que tenemos los clientes cargados
         if (!state.clientes || state.clientes.length === 0) {
-            console.log('Cargando clientes...');
             await cargarClientes();
+        }
+        
+        // Verificar que realmente tenemos clientes
+        if (!state.clientes || state.clientes.length === 0) {
+            showNotification('No se pudieron cargar los clientes. Verifique su conexión.', 'error');
+            return;
         }
         
         // Cargar clientes con crédito habilitado
         const clientesCredito = state.clientes.filter(c => c.creditoHabilitado);
-        console.log('Clientes con crédito encontrados:', clientesCredito.length);
         
         const selectCliente = document.getElementById('conduce-cliente');
-        console.log('Elemento select encontrado:', !!selectCliente);
         
         if (selectCliente) {
-            selectCliente.innerHTML = '<option value="">Seleccione un cliente</option>' +
-                clientesCredito.map(cliente => 
-                    `<option value="${cliente._id}">${cliente.nombre}</option>`
-                ).join('');
-            console.log('Opciones agregadas al select');
+            if (clientesCredito.length === 0) {
+                selectCliente.innerHTML = '<option value="">No hay clientes con crédito habilitado</option>';
+                showNotification('No hay clientes con crédito habilitado. Configure el crédito en la pestaña de Clientes.', 'warning');
+            } else {
+                selectCliente.innerHTML = '<option value="">Seleccione un cliente</option>' +
+                    clientesCredito.map(cliente => 
+                        `<option value="${cliente._id}">${cliente.nombre} - Límite: $${cliente.limiteCredito.toFixed(2)}</option>`
+                    ).join('');
+            }
+        } else {
+            showNotification('Error en la configuración del modal', 'error');
+            return;
         }
         
         // Configurar event listeners para el producto inicial
@@ -2876,10 +2950,9 @@ async function setupConduceModal() {
         // Inicializar cálculos
         calcularTotalConduce();
         
-        console.log('Modal de conduce configurado con', clientesCredito.length, 'clientes con crédito');
     } catch (error) {
         console.error('Error configurando modal de conduce:', error);
-        showNotification('Error cargando clientes', 'error');
+        showNotification('Error cargando clientes: ' + error.message, 'error');
     }
 }
 
@@ -2909,27 +2982,44 @@ async function setupPagarCreditosModal() {
         if (!state.clientes || state.clientes.length === 0) {
             await cargarClientes();
         }
+        
+        // Verificar que realmente tenemos clientes
+        if (!state.clientes || state.clientes.length === 0) {
+            showNotification('No se pudieron cargar los clientes. Verifique su conexión.', 'error');
+            return;
+        }
+        
         // Cargar clientes con crédito habilitado
         const clientesCredito = state.clientes.filter(c => c.creditoHabilitado);
+        
         const selectCliente = document.getElementById('pago-cliente');
         if (selectCliente) {
-            selectCliente.innerHTML = '<option value="">Seleccione un cliente</option>' +
-                clientesCredito.map(cliente => 
-                    `<option value="${cliente._id}">${cliente.nombre}</option>`
-                ).join('');
+            if (clientesCredito.length === 0) {
+                selectCliente.innerHTML = '<option value="">No hay clientes con crédito habilitado</option>';
+                showNotification('No hay clientes con crédito habilitado', 'warning');
+            } else {
+                selectCliente.innerHTML = '<option value="">Seleccione un cliente</option>' +
+                    clientesCredito.map(cliente => 
+                        `<option value="${cliente._id}">${cliente.nombre} - Saldo: $${cliente.saldoPendiente.toFixed(2)}</option>`
+                    ).join('');
+            }
         }
+        
         // Resetear campos de conduces y resumen
         const conducesContainer = document.getElementById('conduces-pendientes');
         if (conducesContainer) conducesContainer.classList.add('hidden');
         const conducesList = document.getElementById('conduces-list-pago');
         if (conducesList) conducesList.innerHTML = '';
+        
+        // Resetear contadores
         document.getElementById('conduces-seleccionados-count').textContent = '0';
         document.getElementById('total-pagar').textContent = '$0.00';
         const btn = document.getElementById('btn-pagar-creditos');
         if (btn) btn.disabled = true;
+        
     } catch (error) {
         console.error('Error configurando modal de pago:', error);
-        showNotification('Error cargando clientes', 'error');
+        showNotification('Error cargando clientes para pago: ' + error.message, 'error');
     }
 }
 

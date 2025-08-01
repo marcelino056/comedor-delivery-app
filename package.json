@@ -5,7 +5,16 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "echo \"No tests specified\" && exit 0",
+    "production": "NODE_ENV=production node server.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop comedor-app",
+    "pm2:restart": "pm2 restart comedor-app",
+    "pm2:logs": "pm2 logs comedor-app",
+    "pm2:status": "pm2 status",
+    "pm2:monit": "pm2 monit",
+    "setup-server": "./setup-server.sh"
   },
   "dependencies": {
     "axios": "^1.11.0",
