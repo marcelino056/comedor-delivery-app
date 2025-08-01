@@ -1,5 +1,5 @@
 // Función helper para obtener fecha local en formato YYYY-MM-DD
-// Última actualización: 2025-08-01 18:30 - Fix modal conduces
+// Última actualización: 2025-08-01 22:55 - Fix WebSocket + debugging modal
 function getLocalDateString(date = new Date()) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -27,6 +27,7 @@ let state = {
 
 // Configuración
 const API_BASE = window.location.origin + '/api';
+// Corregir WebSocket para usar WSS en HTTPS
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3007`;
 
 // Inicialización
@@ -2925,42 +2926,53 @@ async function anularConduce(conduceId) {
 // Configurar modal de conduce
 async function setupConduceModal() {
     try {
-        console.log('[CREDITOS] Configurando modal de conduce...');
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`[CREDITOS-${timestamp}] === CONFIGURANDO MODAL DE CONDUCE ===`);
         
-        // Asegurar que tenemos los clientes cargados
-        if (!state.clientes || state.clientes.length === 0) {
-            console.log('[CREDITOS] Cargando clientes...');
-            await cargarClientes();
+        // Verificar que el modal está realmente abierto y los elementos existen
+        const modal = document.getElementById('modal');
+        const selectElement = document.getElementById('conduce-cliente');
+        
+        console.log(`[CREDITOS-${timestamp}] Modal encontrado:`, !!modal);
+        console.log(`[CREDITOS-${timestamp}] Select elemento encontrado:`, !!selectElement);
+        
+        if (!selectElement) {
+            console.error(`[CREDITOS-${timestamp}] ELEMENTO conduce-cliente NO ENCONTRADO!`);
+            showNotification('Error: No se puede configurar el modal', 'error');
+            return;
         }
         
-        console.log('[CREDITOS] Clientes disponibles:', state.clientes?.length || 0);
+        // Asegurar que tenemos los clientes cargados
+        console.log(`[CREDITOS-${timestamp}] Clientes en state:`, state.clientes?.length || 0);
+        
+        if (!state.clientes || state.clientes.length === 0) {
+            console.log(`[CREDITOS-${timestamp}] Cargando clientes desde API...`);
+            await cargarClientes();
+            console.log(`[CREDITOS-${timestamp}] Después de cargar: `, state.clientes?.length || 0);
+        }
         
         // Verificar que realmente tenemos clientes
         if (!state.clientes || state.clientes.length === 0) {
-            console.warn('[CREDITOS] No se pudieron cargar los clientes');
-            showNotification('No se pudieron cargar los clientes. Verifique su conexión.', 'error');
+            console.warn(`[CREDITOS-${timestamp}] NO HAY CLIENTES DISPONIBLES`);
+            selectElement.innerHTML = '<option value="">No hay clientes disponibles</option>';
+            showNotification('No hay clientes registrados', 'warning');
             return;
         }
         
-        // Cargar todos los clientes (no solo los de crédito para debugging)
-        const selectCliente = document.getElementById('conduce-cliente');
+        // Configurar las opciones del select
+        console.log(`[CREDITOS-${timestamp}] Configurando ${state.clientes.length} clientes...`);
         
-        if (selectCliente) {
-            console.log('[CREDITOS] Configurando select de clientes...');
-            
-            // Primero cargar todos los clientes para ver si el problema es el filtro
-            selectCliente.innerHTML = '<option value="">Seleccione un cliente</option>' +
-                state.clientes.map(cliente => {
-                    const credito = cliente.creditoHabilitado ? ' (Crédito)' : ' (Sin crédito)';
-                    return `<option value="${cliente._id}">${cliente.nombre}${credito}</option>`
-                }).join('');
-            
-            console.log('[CREDITOS] Select configurado con', state.clientes.length, 'clientes');
-        } else {
-            console.error('[CREDITOS] No se encontró el elemento conduce-cliente');
-            showNotification('Error en la configuración del modal', 'error');
-            return;
-        }
+        const opciones = ['<option value="">Seleccione un cliente</option>'];
+        
+        state.clientes.forEach((cliente, index) => {
+            const credito = cliente.creditoHabilitado ? ' ✅' : ' ❌';
+            const limite = cliente.limiteCredito || 0;
+            opciones.push(`<option value="${cliente._id}">${cliente.nombre}${credito} (Límite: $${limite})</option>`);
+            console.log(`[CREDITOS-${timestamp}] Cliente ${index + 1}: ${cliente.nombre}, Crédito: ${cliente.creditoHabilitado}, ID: ${cliente._id}`);
+        });
+        
+        selectElement.innerHTML = opciones.join('');
+        console.log(`[CREDITOS-${timestamp}] ✅ Modal configurado exitosamente con ${state.clientes.length} clientes`);
         
         // Configurar event listeners para el producto inicial
         if (typeof setupProductoConduceEventListeners === 'function') {
@@ -2972,10 +2984,8 @@ async function setupConduceModal() {
             calcularTotalConduce();
         }
         
-        console.log('[CREDITOS] Modal de conduce configurado exitosamente');
-        
     } catch (error) {
-        console.error('[CREDITOS] Error configurando modal de conduce:', error);
+        console.error('[CREDITOS] ❌ ERROR configurando modal de conduce:', error);
         showNotification('Error cargando clientes: ' + error.message, 'error');
     }
 }
