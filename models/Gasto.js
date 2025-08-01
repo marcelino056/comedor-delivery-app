@@ -2,8 +2,9 @@
 const mongoose = require('mongoose');
 
 const gastoSchema = new mongoose.Schema({
-  concepto: String,
-  monto: Number,
+  descripcion: { type: String, required: true },
+  monto: { type: Number, required: true },
+  categoria: { type: String, default: 'otros' },
   timestamp: { type: Date, default: Date.now }
 });
 

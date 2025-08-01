@@ -1,3 +1,11 @@
+// Función helper para obtener fecha local en formato YYYY-MM-DD
+function getLocalDateString(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // Estado global de la aplicación
 let state = {
     ventas: [],
@@ -7,12 +15,13 @@ let state = {
     clientes: [],
     facturas: [],
     configuracionesRNC: [],
-    activeTab: 'ventas',
+    configuracionEmpresa: {},
+    activeTab: localStorage.getItem('activeTab') || 'ventas', // Recuperar tab guardado o usar ventas por defecto
     filtroEstado: 'todos',
     ws: null,
     ventaActual: 0,
     historialVisible: false,
-    fechaSeleccionada: new Date().toISOString().split('T')[0] // Fecha actual por defecto
+    fechaSeleccionada: getLocalDateString() // Fecha actual local por defecto
 };
 
 // Configuración
@@ -41,6 +50,9 @@ async function initApp() {
     // Configurar event listeners
     setupEventListeners();
 
+    // Restaurar tab activo desde localStorage
+    switchTab(state.activeTab);
+
     // Cargar datos iniciales
     await loadInitialData();
 
@@ -67,11 +79,11 @@ function updateCurrentDate() {
         day: 'numeric'
     });
     
-    // Marcar si es hoy, ayer, etc.
-    const hoy = new Date().toISOString().split('T')[0];
+    // Marcar si es hoy, ayer, etc. usando fecha local
+    const hoy = getLocalDateString();
     const ayer = new Date();
     ayer.setDate(ayer.getDate() - 1);
-    const ayerStr = ayer.toISOString().split('T')[0];
+    const ayerStr = getLocalDateString(ayer);
     
     let etiqueta = '';
     if (state.fechaSeleccionada === hoy) {
@@ -104,7 +116,7 @@ function cambiarFechaSeleccionada() {
 }
 
 function irAHoy() {
-    state.fechaSeleccionada = new Date().toISOString().split('T')[0];
+    state.fechaSeleccionada = getLocalDateString();
     updateCurrentDate();
     cargarDatosFecha();
 }
@@ -169,6 +181,10 @@ async function loadInitialData() {
     // Cargar clientes y configuraciones
     await cargarClientes();
     await cargarConfiguracionesRNC();
+    await cargarConfiguracionEmpresa();
+    
+    // Cargar facturas
+    await cargarFacturas();
     
     // Cargar créditos
     await loadCreditos();
@@ -219,7 +235,7 @@ function handleWebSocketMessage(message) {
             updateCajaView();
             break;
         case 'orden_actualizada':
-            const orden = state.ordenes.find(o => o.id === message.data.id);
+            const orden = state.ordenes.find(o => o._id === message.data._id);
             if (orden) {
                 Object.assign(orden, message.data);
             }
@@ -227,13 +243,14 @@ function handleWebSocketMessage(message) {
             updateCajaView();
             break;
         case 'orden_anulada':
-            const ordenAnular = state.ordenes.find(o => o.id === message.data.id);
+            const ordenAnular = state.ordenes.find(o => o._id === message.data._id);
             if (ordenAnular) ordenAnular.anulada = 1;
             updateOrdenesView();
             updateCajaView();
             break;
         case 'nuevo_gasto':
             state.gastos.unshift(message.data);
+            updateGastosList(); // Agregar actualización de vista de gastos
             updateCajaView();
             break;
         case 'monto_inicial_actualizado':
@@ -245,6 +262,18 @@ function handleWebSocketMessage(message) {
             updateCreditosSummary(state.conduces);
             renderConducesList(state.conduces);
             updateClientFilters(state.clientes);
+            break;
+        case 'nueva_factura':
+            console.log('[WEBSOCKET] Nueva factura recibida, recargando datos...');
+            // Actualizar facturas
+            if (state.facturas) {
+                state.facturas.unshift(message.data);
+                updateFacturasView();
+            }
+            break;
+        case 'creditos_actualizados':
+            console.log('[WEBSOCKET] Créditos actualizados, recargando lista...');
+            loadCreditos();
             break;
     }
 }
@@ -262,6 +291,9 @@ function switchTab(tabName) {
     });
 
     state.activeTab = tabName;
+    
+    // Guardar el tab activo en localStorage
+    localStorage.setItem('activeTab', tabName);
 
     // Actualizar vista específica
     switch (tabName) {
@@ -372,6 +404,11 @@ function openModal(type) {
                     form.onsubmit = pagarCreditos;
                 }
             }, 50);
+            break;
+        case 'configuracion-empresa':
+            title.textContent = 'Configuración de la Empresa';
+            body.innerHTML = getTemplateContent('template-configuracion-empresa-modal');
+            setTimeout(() => setupConfiguracionEmpresaModal(), 100);
             break;
     }
 
@@ -625,10 +662,12 @@ async function submitOrden() {
         if (response.ok) {
             closeModal();
         } else {
-            throw new Error('Error al registrar orden');
+            const errorText = await response.text();
+            console.error('Error al registrar orden:', errorText);
+            alert('Error al registrar la orden');
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error al registrar la orden (catch):', error);
         alert('Error al registrar la orden');
     } finally {
         showLoading(false);
@@ -636,31 +675,41 @@ async function submitOrden() {
 }
 
 async function submitGasto() {
+    console.log('submitGasto ejecutándose...');
     const concepto = document.getElementById('gasto-concepto').value;
     const monto = parseFloat(document.getElementById('gasto-monto').value);
+    console.log('Datos del formulario:', { concepto, monto });
 
     if (!concepto || !monto || monto <= 0) {
         alert('Por favor completa todos los campos');
         return;
     }
 
+    const payload = {
+        descripcion: concepto,
+        monto,
+        categoria: 'otros',
+        timestamp: new Date().toISOString()
+    };
+    console.log('Payload que se va a enviar:', payload);
+
     showLoading(true);
     try {
         const response = await fetch(`${API_BASE}/gastos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                concepto,
-                monto,
-                timestamp: new Date().toISOString()
-            })
+            body: JSON.stringify(payload)
         });
 
-        if (response.ok) {
-            closeModal();
-        } else {
-            throw new Error('Error al registrar gasto');
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response:', response.status, errorText);
+            throw new Error(`Error al registrar gasto: ${response.status} - ${errorText}`);
         }
+        
+        // Recargar datos después del cambio
+        await cargarDatosFecha();
+        closeModal();
     } catch (error) {
         console.error('Error:', error);
         alert('Error al registrar el gasto');
@@ -686,11 +735,16 @@ async function submitMontoInicial() {
             body: JSON.stringify({ fecha, monto })
         });
 
-        if (response.ok) {
-            closeModal();
-        } else {
+        if (!response.ok) {
             throw new Error('Error al establecer monto inicial');
         }
+
+        // Actualizar estado local
+        state.montoInicial[fecha] = monto;
+        
+        // Actualizar vista
+        updateCajaView();
+        closeModal();
     } catch (error) {
         console.error('Error:', error);
         alert('Error al establecer el monto inicial');
@@ -732,6 +786,9 @@ async function anularOrden(id) {
         if (!response.ok) {
             throw new Error('Error al anular orden');
         }
+        
+        // Recargar datos después del cambio
+        await cargarDatosFecha();
     } catch (error) {
         console.error('Error:', error);
         alert('Error al anular la orden');
@@ -741,6 +798,7 @@ async function anularOrden(id) {
 }
 
 async function cambiarEstadoOrden(id, estado) {
+    showLoading(true);
     try {
         const response = await fetch(`${API_BASE}/ordenes/${id}/estado`, {
             method: 'PUT',
@@ -751,13 +809,19 @@ async function cambiarEstadoOrden(id, estado) {
         if (!response.ok) {
             throw new Error('Error al cambiar estado');
         }
+        
+        // Recargar datos después del cambio
+        await cargarDatosFecha();
     } catch (error) {
         console.error('Error:', error);
         alert('Error al cambiar el estado');
+    } finally {
+        showLoading(false);
     }
 }
 
 async function cambiarMetodoPagoOrden(id, metodoPago) {
+    showLoading(true);
     try {
         const response = await fetch(`${API_BASE}/ordenes/${id}/metodoPago`, {
             method: 'PUT',
@@ -768,9 +832,14 @@ async function cambiarMetodoPagoOrden(id, metodoPago) {
         if (!response.ok) {
             throw new Error('Error al cambiar método de pago');
         }
+        
+        // Recargar datos después del cambio
+        await cargarDatosFecha();
     } catch (error) {
         console.error('Error:', error);
         alert('Error al cambiar el método de pago');
+    } finally {
+        showLoading(false);
     }
 }
 
@@ -921,15 +990,15 @@ function updateOrdenesView() {
                     ${!orden.anulada && fechaEsHoy ? `
                         <div class="payment-buttons">
                             <button class="payment-btn efectivo ${orden.metodoPago === 'efectivo' ? 'active' : ''}" 
-                                    onclick="cambiarMetodoPagoOrden(${orden.id}, 'efectivo')">
+                                    onclick="cambiarMetodoPagoOrden('${orden._id}', 'efectivo')">
                                 💵 Efectivo
                             </button>
                             <button class="payment-btn tarjeta ${orden.metodoPago === 'tarjeta' ? 'active' : ''}"
-                                    onclick="cambiarMetodoPagoOrden(${orden.id}, 'tarjeta')">
+                                    onclick="cambiarMetodoPagoOrden('${orden._id}', 'tarjeta')">
                                 💳 Tarjeta
                             </button>
                             <button class="payment-btn transferencia ${orden.metodoPago === 'transferencia' ? 'active' : ''}"
-                                    onclick="cambiarMetodoPagoOrden(${orden.id}, 'transferencia')">
+                                    onclick="cambiarMetodoPagoOrden('${orden._id}', 'transferencia')">
                                 🏦 Transfer
                             </button>
                         </div>
@@ -949,7 +1018,7 @@ function updateOrdenesView() {
                             ${orden.repartidor}
                         </span>
                         ${!orden.anulada && fechaEsHoy ? `
-                            <button class="delete-btn" onclick="anularOrden(${orden.id})" title="Anular orden">
+                            <button class="delete-btn" onclick="anularOrden('${orden._id}')" title="Anular orden">
                                 🗑️
                             </button>
                         ` : ''}
@@ -957,19 +1026,19 @@ function updateOrdenesView() {
                     ${!orden.anulada && fechaEsHoy ? `
                         <div class="state-buttons">
                             <button class="state-btn recibida ${orden.estado === 'recibida' ? 'active' : ''}"
-                                    onclick="cambiarEstadoOrden(${orden.id}, 'recibida')">
+                                    onclick="cambiarEstadoOrden('${orden._id}', 'recibida')">
                                 Recibida
                             </button>
                             <button class="state-btn preparando ${orden.estado === 'preparando' ? 'active' : ''}"
-                                    onclick="cambiarEstadoOrden(${orden.id}, 'preparando')">
+                                    onclick="cambiarEstadoOrden('${orden._id}', 'preparando')">
                                 Preparando
                             </button>
                             <button class="state-btn en-camino ${orden.estado === 'en-camino' ? 'active' : ''}"
-                                    onclick="cambiarEstadoOrden(${orden.id}, 'en-camino')">
+                                    onclick="cambiarEstadoOrden('${orden._id}', 'en-camino')">
                                 En Camino
                             </button>
                             <button class="state-btn entregada ${orden.estado === 'entregada' ? 'active' : ''}"
-                                    onclick="cambiarEstadoOrden(${orden.id}, 'entregada')">
+                                    onclick="cambiarEstadoOrden('${orden._id}', 'entregada')">
                                 Entregada
                             </button>
                         </div>
@@ -1091,15 +1160,21 @@ function updateCajaView() {
 }
 
 function updateGastosList() {
-    const fechaSeleccionada = new Date(state.fechaSeleccionada + 'T00:00:00').toDateString();
-    const gastosFecha = state.gastos.filter(g => 
-        new Date(g.timestamp).toDateString() === fechaSeleccionada
-    ).slice(0, 10);
+    const fechaSeleccionada = state.fechaSeleccionada; // YYYY-MM-DD format
+    
+    const gastosFecha = state.gastos.filter(g => {
+        // Convertir timestamp UTC a fecha local y extraer solo la parte de fecha
+        const gastoDate = new Date(g.timestamp);
+        const gastoFechaLocal = gastoDate.getFullYear() + '-' + 
+                               String(gastoDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                               String(gastoDate.getDate()).padStart(2, '0');
+        return gastoFechaLocal === fechaSeleccionada;
+    }).slice(0, 10);
 
     const container = document.getElementById('gastos-list');
     
     if (gastosFecha.length === 0) {
-        const esHoy = state.fechaSeleccionada === new Date().toISOString().split('T')[0];
+        const esHoy = state.fechaSeleccionada === getLocalDateString();
         const mensaje = esHoy ? 'No hay gastos registrados hoy' : 'No hay gastos registrados en esta fecha';
         container.innerHTML = `<p style="text-align: center; color: #6b7280; padding: 1rem;">${mensaje}</p>`;
         return;
@@ -1108,7 +1183,7 @@ function updateGastosList() {
     container.innerHTML = gastosFecha.map(gasto => `
         <div class="gasto-item">
             <div class="gasto-header">
-                <span class="gasto-concepto">${gasto.concepto}</span>
+                <span class="gasto-concepto">${gasto.descripcion}</span>
                 <span class="gasto-monto">-${formatCurrency(gasto.monto)}</span>
             </div>
             <p class="gasto-fecha">${formatDateTime(gasto.timestamp)}</p>
@@ -1117,18 +1192,26 @@ function updateGastosList() {
 }
 
 function calcularTotalesDia() {
-    const fechaSeleccionada = new Date(state.fechaSeleccionada + 'T00:00:00').toDateString();
+    const fechaSeleccionada = state.fechaSeleccionada; // YYYY-MM-DD format
+    
+    // Función helper para convertir UTC a fecha local
+    function getLocalDateString(timestamp) {
+        const date = new Date(timestamp);
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0');
+    }
     
     const ventasFecha = state.ventas.filter(v => 
-        new Date(v.timestamp).toDateString() === fechaSeleccionada && !v.anulada
+        getLocalDateString(v.timestamp) === fechaSeleccionada && !v.anulada
     );
     
     const gastosFecha = state.gastos.filter(g => 
-        new Date(g.timestamp).toDateString() === fechaSeleccionada
+        getLocalDateString(g.timestamp) === fechaSeleccionada
     );
 
     const ordenesFecha = state.ordenes.filter(o => 
-        new Date(o.timestamp).toDateString() === fechaSeleccionada && !o.anulada
+        getLocalDateString(o.timestamp) === fechaSeleccionada && !o.anulada
     );
 
     const totalVentasLocal = ventasFecha.reduce((sum, venta) => sum + venta.monto, 0);
@@ -1182,7 +1265,7 @@ function calcularTotalesDia() {
 
 // Utilidades
 function esHoy() {
-    return state.fechaSeleccionada === new Date().toISOString().split('T')[0];
+    return state.fechaSeleccionada === getLocalDateString();
 }
 
 function formatCurrency(amount) {
@@ -1320,6 +1403,144 @@ function toggleHistorialVentas() {
     }
 }
 
+// === MODAL DE ÉXITO FACTURA ===
+function mostrarModalExitoFactura(factura) {
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+    
+    title.textContent = '✅ Factura Generada';
+    body.innerHTML = getTemplateContent('template-exito-factura-modal');
+    
+    // Configurar datos de la factura
+    document.getElementById('factura-numero').textContent = factura.numero || factura._id;
+    document.getElementById('factura-total').textContent = new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP'
+    }).format(factura.total);
+    
+    // Configurar eventos de botones
+    document.getElementById('btn-descargar-pdf').onclick = () => {
+        descargarFacturaPDF(factura._id);
+        closeModal();
+    };
+    
+    document.getElementById('btn-compartir').onclick = () => {
+        compartirFactura(factura);
+    };
+    
+    document.getElementById('btn-cerrar-exito').onclick = () => {
+        closeModal();
+    };
+    
+    modal.classList.remove('hidden');
+}
+
+async function compartirFactura(factura) {
+    try {
+        const facturaTexto = `Factura #${factura.numero || factura._id}\nTotal: ${new Intl.NumberFormat('es-CO', {
+            style: 'currency',
+            currency: 'COP'
+        }).format(factura.total)}\n\nGenerada en: ${new Date().toLocaleString('es-CO')}`;
+        
+        // Verificar si la Web Share API está disponible (dispositivos móviles nativos)
+        if (navigator.share) {
+            await navigator.share({
+                title: 'Factura Generada',
+                text: facturaTexto,
+                url: window.location.href
+            });
+        } else {
+            // Fallback: copiar al portapapeles
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(facturaTexto);
+                showNotification('Información de la factura copiada al portapapeles', 'success');
+            } else {
+                // Fallback para navegadores más antiguos
+                const textArea = document.createElement('textarea');
+                textArea.value = facturaTexto;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showNotification('Información de la factura copiada al portapapeles', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Error al compartir:', error);
+        showNotification('Error al compartir la factura', 'error');
+    }
+}
+
+// === MODAL DE ÉXITO CONDUCE ===
+function mostrarModalExitoConduce(conduce) {
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+    
+    title.textContent = '✅ Conduce Generado';
+    body.innerHTML = getTemplateContent('template-exito-conduce-modal');
+    
+    // Configurar datos del conduce
+    document.getElementById('conduce-numero').textContent = conduce.numero || conduce._id;
+    document.getElementById('conduce-total-modal').textContent = new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP'
+    }).format(conduce.total);
+    
+    // Configurar eventos de botones
+    document.getElementById('btn-descargar-conduce-pdf').onclick = () => {
+        verConducePDF(conduce._id);
+        closeModal();
+    };
+    
+    document.getElementById('btn-compartir-conduce').onclick = () => {
+        compartirConduce(conduce);
+    };
+    
+    document.getElementById('btn-cerrar-exito-conduce').onclick = () => {
+        closeModal();
+    };
+    
+    modal.classList.remove('hidden');
+}
+
+async function compartirConduce(conduce) {
+    try {
+        const conduceTexto = `Conduce a Crédito #${conduce.numero || conduce._id}\nTotal: ${new Intl.NumberFormat('es-CO', {
+            style: 'currency',
+            currency: 'COP'
+        }).format(conduce.total)}\nCliente: ${conduce.cliente?.nombre || 'N/A'}\n\nGenerado en: ${new Date().toLocaleString('es-CO')}`;
+        
+        // Verificar si la Web Share API está disponible (dispositivos móviles nativos)
+        if (navigator.share) {
+            await navigator.share({
+                title: 'Conduce a Crédito Generado',
+                text: conduceTexto,
+                url: window.location.href
+            });
+        } else {
+            // Fallback: copiar al portapapeles
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(conduceTexto);
+                showNotification('Información del conduce copiada al portapapeles', 'success');
+            } else {
+                // Fallback para navegadores más antiguos
+                const textArea = document.createElement('textarea');
+                textArea.value = conduceTexto;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showNotification('Información del conduce copiada al portapapeles', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Error al compartir:', error);
+        showNotification('Error al compartir el conduce', 'error');
+    }
+}
+
 // Funciones globales para eventos onclick
 window.openModal = openModal;
 window.closeModal = closeModal;
@@ -1337,6 +1558,9 @@ window.limpiarMonto = limpiarMonto;
 window.establecerMonto = establecerMonto;
 window.procesarVenta = procesarVenta;
 window.toggleHistorialVentas = toggleHistorialVentas;
+window.abrirConfiguracion = abrirConfiguracion;
+window.guardarConfiguracionEmpresa = guardarConfiguracionEmpresa;
+window.removerLogo = removerLogo;
 window.setFilter = setFilter;
 window.generarReporteDiario = generarReporteDiario;
 
@@ -1345,32 +1569,54 @@ async function generarReporteDiario() {
     try {
         showLoading(true);
         
-        const hoy = new Date().toISOString().split('T')[0];
-        const response = await fetch(`${API_BASE}/reporte-diario/${hoy}`);
+        // Usar fecha local correcta en lugar de UTC
+        const fechaReporte = state.fechaSeleccionada || getLocalDateString();
+        console.log('Generando reporte para fecha:', fechaReporte);
+        
+        const response = await fetch(`${API_BASE}/reporte/diario/${fechaReporte}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/pdf'
+            }
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
         
         if (!response.ok) {
-            throw new Error('Error al generar el reporte');
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            throw new Error(`Error al generar el reporte: ${response.status} - ${errorText}`);
+        }
+        
+        // Verificar que la respuesta sea un PDF
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/pdf')) {
+            console.error('Response is not a PDF:', contentType);
+            throw new Error('La respuesta no es un archivo PDF válido');
         }
         
         // Crear blob con el PDF
         const blob = await response.blob();
+        console.log('PDF blob created, size:', blob.size);
         
         // Crear URL temporal y descargar
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `reporte-diario-${hoy.replace(/-/g, '')}.pdf`;
+        a.download = `reporte-diario-${fechaReporte.replace(/-/g, '')}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         
+        console.log('Reporte descargado exitosamente');
         showLoading(false);
         
     } catch (error) {
         showLoading(false);
         console.error('Error generando reporte:', error);
-        alert('❌ Error al generar el reporte. Inténtalo nuevamente.');
+        alert(`❌ Error al generar el reporte: ${error.message}`);
     }
 }
 
@@ -1568,9 +1814,13 @@ async function cargarFacturas() {
     try {
         const filtros = new URLSearchParams();
         
-        const periodo = document.getElementById('filtro-periodo')?.value || 'hoy';
-        const tipo = document.getElementById('filtro-tipo')?.value;
-        const rnc = document.getElementById('filtro-rnc')?.value;
+        // Usar valores por defecto si los elementos no existen (ej: al inicializar)
+        const periodoElement = document.getElementById('filtro-periodo');
+        const periodo = periodoElement?.value || 'hoy';
+        const tipoElement = document.getElementById('filtro-tipo');
+        const tipo = tipoElement?.value;
+        const rncElement = document.getElementById('filtro-rnc');
+        const rnc = rncElement?.value;
 
         if (periodo === 'hoy') {
             filtros.append('fecha', state.fechaSeleccionada);
@@ -1579,8 +1829,10 @@ async function cargarFacturas() {
             filtros.append('mes', fecha.getMonth() + 1);
             filtros.append('anio', fecha.getFullYear());
         } else if (periodo === 'personalizado') {
-            const desde = document.getElementById('fecha-desde')?.value;
-            const hasta = document.getElementById('fecha-hasta')?.value;
+            const desdeElement = document.getElementById('fecha-desde');
+            const hastaElement = document.getElementById('fecha-hasta');
+            const desde = desdeElement?.value;
+            const hasta = hastaElement?.value;
             if (desde) filtros.append('fechaDesde', desde);
             if (hasta) filtros.append('fechaHasta', hasta);
         }
@@ -1691,10 +1943,8 @@ async function generarFactura(event) {
         closeModal();
         showLoading(false);
         
-        // Preguntar si desea descargar PDF
-        if (confirm('Factura generada exitosamente. ¿Desea descargar el PDF?')) {
-            descargarFacturaPDF(factura._id);
-        }
+        // Mostrar modal de éxito con opciones
+        mostrarModalExitoFactura(factura);
         
     } catch (error) {
         showLoading(false);
@@ -1988,7 +2238,7 @@ async function descargarReporteRNC(event) {
         const mes = document.getElementById('reporte-mes').value;
         const anio = document.getElementById('reporte-anio').value;
         
-        const response = await fetch(`${API_BASE}/reportes/facturas-rnc?mes=${mes}&anio=${anio}`);
+        const response = await fetch(`${API_BASE}/facturas/reporte-rnc?mes=${mes}&anio=${anio}`);
         if (!response.ok) throw new Error('Error al generar reporte');
 
         const blob = await response.blob();
@@ -2020,6 +2270,10 @@ window.desactivarCliente = desactivarCliente;
 window.crearFacturaParaCliente = crearFacturaParaCliente;
 window.generarFactura = generarFactura;
 window.descargarFacturaPDF = descargarFacturaPDF;
+window.mostrarModalExitoFactura = mostrarModalExitoFactura;
+window.compartirFactura = compartirFactura;
+window.mostrarModalExitoConduce = mostrarModalExitoConduce;
+window.compartirConduce = compartirConduce;
 window.anularFactura = anularFactura;
 window.actualizarDatosCliente = actualizarDatosCliente;
 window.toggleRNCOptions = toggleRNCOptions;
@@ -2043,6 +2297,7 @@ window.filtrarCreditos = filtrarCreditos;
 window.verConducePDF = verConducePDF;
 window.anularConduce = anularConduce;
 window.setupConduceModal = setupConduceModal;
+window.setupProductoConduceEventListeners = setupProductoConduceEventListeners;
 window.setupPagarCreditosModal = setupPagarCreditosModal;
 window.toggleCreditoFields = toggleCreditoFields;
 
@@ -2095,11 +2350,29 @@ function agregarProductoConduce() {
     const nuevoProducto = document.createElement('div');
     nuevoProducto.className = 'producto-item';
     nuevoProducto.innerHTML = `
-        <input type="text" placeholder="Descripción del producto" name="descripcion" required>
-        <input type="number" placeholder="Cantidad" name="cantidad" min="1" required onchange="calcularTotalConduce()">
-        <input type="number" placeholder="Precio" name="precio" min="0" step="0.01" required onchange="calcularTotalConduce()">
-        <button type="button" class="btn-danger btn-sm" onclick="eliminarProductoConduce(this)">✕</button>
+        <div class="form-row">
+            <div class="form-group">
+                <input type="text" placeholder="Descripción *" name="descripcion" class="producto-descripcion" required>
+            </div>
+            <div class="form-group">
+                <input type="number" placeholder="Cant." name="cantidad" class="producto-cantidad" min="1" value="1" required>
+            </div>
+            <div class="form-group">
+                <input type="number" placeholder="Precio" name="precio" class="producto-precio" step="0.01" min="0" required>
+            </div>
+            <div class="form-group">
+                <input type="number" placeholder="Total" name="total" class="producto-total" readonly>
+            </div>
+            <button type="button" class="btn-danger btn-sm" onclick="eliminarProductoConduce(this)">✕</button>
+        </div>
     `;
+    
+    // Agregar event listeners para recalcular automáticamente
+    const cantidadInput = nuevoProducto.querySelector('.producto-cantidad');
+    const precioInput = nuevoProducto.querySelector('.producto-precio');
+    
+    cantidadInput.addEventListener('input', calcularTotalConduce);
+    precioInput.addEventListener('input', calcularTotalConduce);
     productosContainer.appendChild(nuevoProducto);
 }
 
@@ -2109,6 +2382,8 @@ function eliminarProductoConduce(button) {
     if (productosContainer.children.length > 1) {
         button.closest('.producto-item').remove();
         calcularTotalConduce();
+    } else {
+        showNotification('Debe mantener al menos un producto en el conduce', 'warning');
     }
 }
 
@@ -2118,9 +2393,17 @@ function calcularTotalConduce() {
     let subtotal = 0;
     
     productos.forEach(producto => {
-        const cantidad = parseFloat(producto.querySelector('[name="cantidad"]').value) || 0;
-        const precio = parseFloat(producto.querySelector('[name="precio"]').value) || 0;
-        subtotal += cantidad * precio;
+        const cantidad = parseFloat(producto.querySelector('.producto-cantidad').value) || 0;
+        const precio = parseFloat(producto.querySelector('.producto-precio').value) || 0;
+        const totalProducto = cantidad * precio;
+        
+        // Actualizar el campo total del producto
+        const totalField = producto.querySelector('.producto-total');
+        if (totalField) {
+            totalField.value = totalProducto.toFixed(2);
+        }
+        
+        subtotal += totalProducto;
     });
     
     const impuesto = subtotal * 0.18;
@@ -2215,13 +2498,10 @@ async function guardarConduce(event) {
         const conduce = await response.json();
         
         closeModal();
-        showNotification('Conduce creado exitosamente', 'success');
         await loadCreditos();
         
-        // Preguntar si quiere descargar el PDF
-        if (confirm('¿Desea descargar el conduce en PDF?')) {
-            verConducePDF(conduce._id);
-        }
+        // Mostrar modal de éxito con opciones
+        mostrarModalExitoConduce(conduce);
         
     } catch (error) {
         console.error('Error guardando conduce:', error);
@@ -2343,8 +2623,15 @@ async function pagarCreditos(event) {
         console.log('Factura creada:', factura);
         closeModal();
         showNotification('Pago procesado exitosamente', 'success');
+        
+        console.log('[PAGO-CREDITOS] Recargando datos después del pago...');
+        
+        // Pequeño delay para asegurar consistencia en la base de datos
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         await loadCreditos();
         await cargarFacturas();
+        console.log('[PAGO-CREDITOS] Datos recargados exitosamente');
         // Preguntar si quiere descargar la factura
         if (factura && factura._id && confirm('¿Desea descargar la factura en PDF?')) {
             descargarFacturaPDF(factura._id);
@@ -2361,6 +2648,7 @@ async function pagarCreditos(event) {
 // Cargar datos de créditos
 async function loadCreditos() {
     try {
+        console.log('[CREDITOS] Cargando conduces y clientes...');
         const [conducesResponse, clientesResponse] = await Promise.all([
             fetch(`${API_BASE}/conduces`),
             fetch(`${API_BASE}/clientes`)
@@ -2368,6 +2656,8 @@ async function loadCreditos() {
         
         const conduces = await conducesResponse.json();
         const clientes = await clientesResponse.json();
+        
+        console.log(`[CREDITOS] Conduces cargados: ${conduces.length}, Clientes: ${clientes.length}`);
         
         // Actualizar estado global
         state.conduces = conduces;
@@ -2476,21 +2766,45 @@ function updateClientFilters(clientes) {
 }
 
 // Filtrar créditos
-function filtrarCreditos() {
+async function filtrarCreditos() {
     const estadoFiltro = document.getElementById('filtro-estado-credito').value;
     const clienteFiltro = document.getElementById('filtro-cliente-credito').value;
     
-    let conducesFiltered = [...(state.conduces || [])];
-    
-    if (estadoFiltro) {
-        conducesFiltered = conducesFiltered.filter(c => c.estado === estadoFiltro);
+    try {
+        // Construir parámetros de consulta
+        const params = new URLSearchParams();
+        
+        if (estadoFiltro) {
+            params.set('estado', estadoFiltro);
+        } else {
+            // Si no hay filtro de estado, incluir todos los estados
+            params.set('incluirTodos', 'true');
+        }
+        
+        if (clienteFiltro) {
+            params.set('cliente', clienteFiltro);
+        }
+        
+        console.log('[CREDITOS] Filtrando con parámetros:', params.toString());
+        
+        // Hacer petición al backend con los filtros
+        const response = await fetch(`${API_BASE}/conduces?${params.toString()}`);
+        const conduces = await response.json();
+        
+        console.log(`[CREDITOS] Conduces filtrados: ${conduces.length}`);
+        
+        // Actualizar la vista con los resultados filtrados
+        renderConducesList(conduces);
+        
+        // Actualizar el resumen solo si no hay filtros específicos (mostrar resumen general)
+        if (!estadoFiltro && !clienteFiltro) {
+            updateCreditosSummary(conduces);
+        }
+        
+    } catch (error) {
+        console.error('[CREDITOS][ERROR] al filtrar:', error);
+        alert('Error al filtrar créditos');
     }
-    
-    if (clienteFiltro) {
-        conducesFiltered = conducesFiltered.filter(c => c.cliente._id === clienteFiltro);
-    }
-    
-    renderConducesList(conducesFiltered);
 }
 
 // Ver conduce en PDF
@@ -2556,6 +2870,9 @@ async function setupConduceModal() {
             console.log('Opciones agregadas al select');
         }
         
+        // Configurar event listeners para el producto inicial
+        setupProductoConduceEventListeners();
+        
         // Inicializar cálculos
         calcularTotalConduce();
         
@@ -2564,6 +2881,25 @@ async function setupConduceModal() {
         console.error('Error configurando modal de conduce:', error);
         showNotification('Error cargando clientes', 'error');
     }
+}
+
+function setupProductoConduceEventListeners() {
+    // Configurar event listeners para todos los productos existentes
+    const productos = document.querySelectorAll('#productos-conduce .producto-item');
+    productos.forEach(producto => {
+        const cantidadInput = producto.querySelector('.producto-cantidad');
+        const precioInput = producto.querySelector('.producto-precio');
+        
+        if (cantidadInput && precioInput) {
+            // Remover listeners existentes para evitar duplicados
+            cantidadInput.removeEventListener('input', calcularTotalConduce);
+            precioInput.removeEventListener('input', calcularTotalConduce);
+            
+            // Agregar nuevos listeners
+            cantidadInput.addEventListener('input', calcularTotalConduce);
+            precioInput.addEventListener('input', calcularTotalConduce);
+        }
+    });
 }
 
 // Configurar modal de pagar créditos
@@ -2595,4 +2931,254 @@ async function setupPagarCreditosModal() {
         console.error('Error configurando modal de pago:', error);
         showNotification('Error cargando clientes', 'error');
     }
+}
+
+// ============= FUNCIONES DE CONFIGURACIÓN DE EMPRESA =============
+
+async function cargarConfiguracionEmpresa() {
+    try {
+        const response = await fetch(`${API_BASE}/configuracion-empresa`);
+        state.configuracionEmpresa = await response.json();
+        console.log('Configuración de empresa cargada:', state.configuracionEmpresa);
+        
+        // Actualizar header inmediatamente después de cargar
+        actualizarHeaderEmpresa();
+    } catch (error) {
+        console.error('Error cargando configuración de empresa:', error);
+    }
+}
+
+function abrirConfiguracion() {
+    openModal('configuracion-empresa');
+}
+
+function actualizarHeaderEmpresa() {
+    const config = state.configuracionEmpresa;
+    if (!config) return;
+
+    // Actualizar nombre
+    const nombreHeader = document.getElementById('empresa-nombre-header');
+    if (nombreHeader) {
+        nombreHeader.textContent = config.nombre || 'Comedor & Delivery';
+    }
+
+    // Actualizar logo
+    const logoHeader = document.getElementById('empresa-logo-header');
+    if (logoHeader && config.logo) {
+        logoHeader.src = config.logo;
+        logoHeader.classList.remove('hidden');
+    } else if (logoHeader) {
+        logoHeader.classList.add('hidden');
+    }
+
+    // Actualizar RNC
+    const rncHeader = document.getElementById('empresa-rnc-header');
+    if (rncHeader && config.rnc) {
+        rncHeader.textContent = config.rnc;
+        rncHeader.classList.remove('hidden');
+    } else if (rncHeader) {
+        rncHeader.classList.add('hidden');
+    }
+
+    // Actualizar teléfono
+    const telefonoHeader = document.getElementById('empresa-telefono-header');
+    if (telefonoHeader && config.telefono) {
+        telefonoHeader.textContent = config.telefono;
+        telefonoHeader.classList.remove('hidden');
+    } else if (telefonoHeader) {
+        telefonoHeader.classList.add('hidden');
+    }
+
+    // Actualizar dirección
+    const direccionHeader = document.getElementById('empresa-direccion-header');
+    if (direccionHeader && config.direccion) {
+        direccionHeader.textContent = config.direccion;
+        direccionHeader.classList.remove('hidden');
+    } else if (direccionHeader) {
+        direccionHeader.classList.add('hidden');
+    }
+
+    // Actualizar título de la página
+    document.title = config.nombre || 'Comedor & Delivery';
+}
+
+async function setupConfiguracionEmpresaModal() {
+    try {
+        // Cargar configuración actual si no está cargada
+        if (!state.configuracionEmpresa || !state.configuracionEmpresa._id) {
+            await cargarConfiguracionEmpresa();
+        }
+
+        // Llenar formulario con datos actuales
+        const config = state.configuracionEmpresa;
+        document.getElementById('empresa-nombre').value = config.nombre || '';
+        document.getElementById('empresa-direccion').value = config.direccion || '';
+        document.getElementById('empresa-telefono').value = config.telefono || '';
+        document.getElementById('empresa-rnc').value = config.rnc || '';
+
+        // Configurar preview del logo si existe
+        if (config.logo) {
+            mostrarPreviewLogo(config.logo);
+        }
+
+        // Configurar event listener para el input de archivo
+        const logoInput = document.getElementById('empresa-logo');
+        logoInput.addEventListener('change', manejarCambioLogo);
+
+    } catch (error) {
+        console.error('Error configurando modal de empresa:', error);
+    }
+}
+
+function manejarCambioLogo(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (file.size > 2 * 1024 * 1024) { // 2MB límite
+            alert('El archivo es muy grande. Máximo 2MB.');
+            event.target.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            mostrarPreviewLogo(e.target.result);
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function mostrarPreviewLogo(logoDataUrl) {
+    const preview = document.getElementById('logo-preview');
+    const img = document.getElementById('logo-preview-img');
+    
+    img.src = logoDataUrl;
+    preview.classList.remove('hidden');
+}
+
+function removerLogo() {
+    const preview = document.getElementById('logo-preview');
+    const logoInput = document.getElementById('empresa-logo');
+    
+    preview.classList.add('hidden');
+    logoInput.value = '';
+}
+
+async function guardarConfiguracionEmpresa() {
+    try {
+        showLoading(true);
+
+        const formData = {
+            nombre: document.getElementById('empresa-nombre').value,
+            direccion: document.getElementById('empresa-direccion').value,
+            telefono: document.getElementById('empresa-telefono').value,
+            rnc: document.getElementById('empresa-rnc').value
+        };
+
+        // Manejar logo si existe
+        const logoInput = document.getElementById('empresa-logo');
+        if (logoInput.files[0]) {
+            // Nuevo logo seleccionado
+            const file = logoInput.files[0];
+            const reader = new FileReader();
+            
+            const logoDataUrl = await new Promise((resolve) => {
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+            
+            formData.logo = logoDataUrl;
+        } else if (state.configuracionEmpresa && state.configuracionEmpresa.logo) {
+            // Mantener logo existente si no se seleccionó uno nuevo
+            const preview = document.getElementById('logo-preview');
+            if (!preview.classList.contains('hidden')) {
+                formData.logo = state.configuracionEmpresa.logo;
+            }
+        }
+
+        const response = await fetch(`${API_BASE}/configuracion-empresa`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al guardar configuración');
+        }
+
+        const configActualizada = await response.json();
+        state.configuracionEmpresa = configActualizada;
+
+        closeModal();
+        showNotification('Configuración guardada exitosamente', 'success');
+        
+        // Actualizar el header con la nueva configuración
+        actualizarHeaderEmpresa();
+
+    } catch (error) {
+        console.error('Error guardando configuración de empresa:', error);
+        showNotification('Error al guardar la configuración', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Función helper para mostrar notificaciones
+function showNotification(message, type = 'info') {
+    // Crear elemento de notificación
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()">✕</button>
+    `;
+    
+    // Agregar estilos si no existen
+    if (!document.getElementById('notification-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-styles';
+        styles.textContent = `
+            .notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 16px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                max-width: 400px;
+                animation: slideIn 0.3s ease-out;
+            }
+            .notification.success { background-color: #16a34a; }
+            .notification.error { background-color: #dc2626; }
+            .notification.info { background-color: #3b82f6; }
+            .notification button {
+                background: none;
+                border: none;
+                color: white;
+                cursor: pointer;
+                font-size: 18px;
+                padding: 0;
+                margin-left: auto;
+            }
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Agregar al DOM
+    document.body.appendChild(notification);
+    
+    // Auto-remover después de 5 segundos
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
 }

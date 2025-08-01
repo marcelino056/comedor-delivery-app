@@ -15,7 +15,15 @@ module.exports = {
       }
       const ventas = await Venta.find(query).populate('cliente', 'nombre telefono');
       console.log(`[VENTAS] Total encontradas: ${ventas.length}`);
-      res.json(ventas);
+      // Normalizar campos para frontend
+      const ventasNormalizadas = ventas.map(v => {
+        const ventaObj = v.toObject();
+        ventaObj.monto = Number(ventaObj.total) || 0;
+        let fechaBase = ventaObj.fecha || ventaObj.createdAt || new Date();
+        ventaObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
+        return ventaObj;
+      });
+      res.json(ventasNormalizadas);
     } catch (error) {
       console.error('[VENTAS][ERROR] al consultar todas:', error);
       res.status(500).json({ error: error.message });
@@ -62,12 +70,18 @@ module.exports = {
       const venta = new Venta(ventaData);
       await venta.save();
       await venta.populate('cliente', 'nombre telefono');
-      console.log('[VENTAS] Venta creada:', venta.numero, venta);
+      // Normalizar campos para frontend
+      const ventaObj = venta.toObject();
+      ventaObj.monto = Number(ventaObj.total) || 0; // Asegura número
+      // timestamp: siempre string ISO
+      let fechaBase = ventaObj.fecha || ventaObj.createdAt || new Date();
+      ventaObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
+      console.log('[VENTAS] Venta creada:', venta.numero, ventaObj);
       // Emitir por WebSocket
       if (global.broadcast) {
-        global.broadcast({ type: 'nueva_venta', data: venta });
+        global.broadcast({ type: 'nueva_venta', data: ventaObj });
       }
-      res.json(venta);
+      res.json(ventaObj);
     } catch (error) {
       console.error('[VENTAS][ERROR] al crear:', error, 'Datos recibidos:', req.body);
       res.status(500).json({ error: error.message });

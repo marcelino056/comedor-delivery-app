@@ -15,7 +15,24 @@
     <div id="app">
         <!-- Header -->
         <header class="header">
-            <h1>Comedor & Delivery</h1>
+            <div class="header-left">
+                <div class="empresa-info">
+                    <div class="empresa-logo-container">
+                        <img id="empresa-logo-header" src="" alt="Logo" class="empresa-logo hidden">
+                    </div>
+                    <div class="empresa-detalles">
+                        <h1 id="empresa-nombre-header">Comedor & Delivery</h1>
+                        <div class="empresa-meta">
+                            <span id="empresa-rnc-header" class="empresa-rnc hidden"></span>
+                            <span id="empresa-telefono-header" class="empresa-telefono hidden"></span>
+                            <span id="empresa-direccion-header" class="empresa-direccion hidden"></span>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-config" onclick="abrirConfiguracion()" title="Configuración de la Empresa">
+                    ⚙️
+                </button>
+            </div>
             <div class="fecha-container">
                 <p id="fecha-actual"></p>
                 <div class="fecha-controls">
@@ -636,17 +653,28 @@
                 </div>
             </div>
 
-            <div class="productos-container">
-                <div class="productos-header">
-                    <h4>Productos</h4>
-                    <button type="button" class="btn-success btn-sm" onclick="agregarProductoConduce()">+ Agregar Producto</button>
+            <div class="productos-section">
+                <div class="section-header">
+                    <h4>Productos/Servicios</h4>
+                    <button type="button" class="btn-secondary btn-sm" onclick="agregarProductoConduce()">+ Agregar Producto</button>
                 </div>
                 <div id="productos-conduce" class="productos-list">
                     <div class="producto-item">
-                        <input type="text" placeholder="Descripción del producto" name="descripcion" required>
-                        <input type="number" placeholder="Cantidad" name="cantidad" min="1" required onchange="calcularTotalConduce()">
-                        <input type="number" placeholder="Precio" name="precio" min="0" step="0.01" required onchange="calcularTotalConduce()">
-                        <button type="button" class="btn-danger btn-sm" onclick="eliminarProductoConduce(this)">✕</button>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <input type="text" placeholder="Descripción *" name="descripcion" class="producto-descripcion" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="number" placeholder="Cant." name="cantidad" class="producto-cantidad" min="1" value="1" required onchange="calcularTotalConduce()">
+                            </div>
+                            <div class="form-group">
+                                <input type="number" placeholder="Precio" name="precio" class="producto-precio" step="0.01" min="0" required onchange="calcularTotalConduce()">
+                            </div>
+                            <div class="form-group">
+                                <input type="number" placeholder="Total" name="total" class="producto-total" readonly>
+                            </div>
+                            <button type="button" class="btn-danger btn-sm" onclick="eliminarProductoConduce(this)">✕</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -712,6 +740,106 @@
                 <button type="submit" class="btn-success" id="btn-pagar-creditos" disabled>Procesar Pago</button>
             </div>
         </form>
+    </template>
+
+    <template id="template-exito-factura-modal">
+        <div class="exito-factura-content">
+            <div class="exito-icon">
+                <div class="check-circle">✓</div>
+            </div>
+            
+            <div class="exito-info">
+                <h3>Factura generada exitosamente</h3>
+                <div class="factura-details">
+                    <div class="detail-item">
+                        <span class="label">Número:</span>
+                        <span class="value" id="factura-numero">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Total:</span>
+                        <span class="value total" id="factura-total">$0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-actions exito-actions">
+            <button type="button" class="btn-secondary" id="btn-cerrar-exito">Cerrar</button>
+            <button type="button" class="btn-share" id="btn-compartir">📤 Compartir</button>
+            <button type="button" class="btn-primary" id="btn-descargar-pdf">📄 Descargar PDF</button>
+        </div>
+    </template>
+
+    <template id="template-exito-conduce-modal">
+        <div class="exito-factura-content">
+            <div class="exito-icon">
+                <div class="check-circle">✓</div>
+            </div>
+            
+            <div class="exito-info">
+                <h3>Conduce a crédito generado exitosamente</h3>
+                <div class="factura-details">
+                    <div class="detail-item">
+                        <span class="label">Número:</span>
+                        <span class="value" id="conduce-numero">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Total:</span>
+                        <span class="value total" id="conduce-total-modal">$0.00</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Estado:</span>
+                        <span class="value" style="color: #f59e0b;">Pendiente de Pago</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-actions exito-actions">
+            <button type="button" class="btn-secondary" id="btn-cerrar-exito-conduce">Cerrar</button>
+            <button type="button" class="btn-share" id="btn-compartir-conduce">📤 Compartir</button>
+            <button type="button" class="btn-primary" id="btn-descargar-conduce-pdf">📄 Descargar PDF</button>
+        </div>
+    </template>
+
+    <!-- Template: Modal de Configuración de Empresa -->
+    <template id="template-configuracion-empresa-modal">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="empresa-nombre">Nombre de la Empresa:</label>
+                <input type="text" id="empresa-nombre" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="empresa-direccion">Dirección:</label>
+                <input type="text" id="empresa-direccion">
+            </div>
+            
+            <div class="form-group">
+                <label for="empresa-telefono">Teléfono:</label>
+                <input type="tel" id="empresa-telefono">
+            </div>
+            
+            <div class="form-group">
+                <label for="empresa-rnc">RNC:</label>
+                <input type="text" id="empresa-rnc">
+            </div>
+            
+            <div class="form-group full-width">
+                <label for="empresa-logo">Logo (opcional):</label>
+                <input type="file" id="empresa-logo" accept="image/*">
+                <small class="form-help">Selecciona una imagen para el logo de la empresa (aparecerá en los PDFs)</small>
+                <div id="logo-preview" class="logo-preview hidden">
+                    <img id="logo-preview-img" src="" alt="Preview del logo">
+                    <button type="button" class="btn-remove-logo" onclick="removerLogo()">✕ Quitar logo</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="guardarConfiguracionEmpresa()">Guardar</button>
+        </div>
     </template>
 
     <!-- Modal -->

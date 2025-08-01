@@ -30,6 +30,10 @@ app.use('/api/clientes', clienteRoutes);
 const configuracionRNCRoutes = require('./routes/configuracionRNCRoutes');
 app.use('/api/configuracion-rnc', configuracionRNCRoutes);
 
+// ============= RUTAS API PARA CONFIGURACIÓN EMPRESA (MVC) =============
+const configuracionEmpresaRoutes = require('./routes/configuracionEmpresaRoutes');
+app.use('/api/configuracion-empresa', configuracionEmpresaRoutes);
+
 // ============= RUTAS API PARA CONDUCES (MVC) =============
 const conduceRoutes = require('./routes/conduceRoutes');
 app.use('/api/conduces', conduceRoutes);
@@ -42,10 +46,21 @@ app.use('/api/facturas', facturaRoutes);
 const ventaRoutes = require('./routes/ventaRoutes');
 app.use('/api/ventas', ventaRoutes);
 
+// ============= RUTAS API PARA ÓRDENES (MVC) =============
+const ordenRoutes = require('./routes/ordenRoutes');
+app.use('/api/ordenes', ordenRoutes);
+
+// ============= RUTAS API PARA GASTOS (MVC) =============
+const gastoRoutes = require('./routes/gastoRoutes');
+app.use('/api/gastos', gastoRoutes);
+
+// ============= RUTAS API PARA MONTO INICIAL (MVC) =============
+const montoInicialRoutes = require('./routes/montoInicialRoutes');
+app.use('/api/monto-inicial', montoInicialRoutes);
+
 // ============= RUTA PARA MIGRACIÓN DE DATOS (MVC) =============
 const migracionRoutes = require('./routes/migracionRoutes');
 app.use('/api/migrate', migracionRoutes);
-
 
 // Servir archivos estáticos (JS, CSS, manifest, icons, etc.)
 app.use(express.static(path.join(__dirname, 'public')));
@@ -56,7 +71,7 @@ app.get('/', (req, res) => {
 });
 
 // ================== INICIAR SERVIDOR Y LOGS ==================
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3007;
 const ENV = process.env.NODE_ENV || 'development';
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/comedor';
 
@@ -70,8 +85,11 @@ const server = app.listen(PORT, () => {
 });
 
 // Inicializar WebSocket
+
 initWebSocket(server);
 console.log('🟢 WebSocket Server inicializado');
+// Hacer broadcast global para los controladores
+global.broadcast = broadcast;
 
 // Manejar cierre graceful
 process.on('SIGINT', async () => {

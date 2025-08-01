@@ -1,12 +1,25 @@
 const Conduce = require('../models/Conduce');
 const Cliente = require('../models/Cliente');
+const ConfiguracionEmpresa = require('../models/ConfiguracionEmpresa');
 
 module.exports = {
   async getAll(req, res) {
     try {
-      console.log('[CONDUCES] Consultando todos los conduces');
-      const query = req.query || {};
-      const conduces = await Conduce.find(query).populate('cliente', 'nombre telefono rnc direccion');
+      console.log('[CONDUCES] Consultando todos los conduces. Query:', req.query);
+      const { incluirTodos, ...queryParams } = req.query;
+      const query = { ...queryParams };
+      
+      // Por defecto, mostrar solo conduces pendientes (no pagados ni anulados)
+      if (!query.estado && !incluirTodos) {
+        query.estado = 'pendiente';
+      }
+      
+      console.log('[CONDUCES] Query final:', query);
+      const conduces = await Conduce.find(query)
+        .populate('cliente', 'nombre telefono rnc direccion')
+        .sort({ fechaCreacion: -1 });
+      
+      console.log(`[CONDUCES] Total encontrados: ${conduces.length}`);
       res.json(conduces);
     } catch (error) {
       console.error('[CONDUCES][ERROR] al consultar todos:', error);
@@ -74,16 +87,41 @@ module.exports = {
         console.warn(`[CONDUCES][WARN] Conduce no encontrado para PDF: ${req.params.id}`);
         return res.status(404).json({ error: 'Conduce no encontrado' });
       }
+
+      // Cargar configuración de la empresa
+      let configuracionEmpresa;
+      try {
+        configuracionEmpresa = await ConfiguracionEmpresa.findOne();
+      } catch (error) {
+        console.warn('[CONDUCES] Error cargando configuración de empresa, usando valores por defecto:', error);
+        configuracionEmpresa = {
+          nombre: 'COMEDOR & DELIVERY',
+          direccion: 'Tu Dirección Aquí',
+          telefono: '(809) 123-4567',
+          rnc: '123456789'
+        };
+      }
+
       const PDFDocument = require('pdfkit');
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="conduce-${conduce.numero}.pdf"`);
       doc.pipe(res);
-      doc.fontSize(20).text('COMEDOR & DELIVERY', 50, 50);
+
+      // Cabecera de la empresa con información dinámica
+      doc.fontSize(20).text(configuracionEmpresa?.nombre || 'COMEDOR & DELIVERY', 50, 50);
       doc.fontSize(12).text('Sistema de Facturación', 50, 75);
-      doc.text('RNC: 123456789', 50, 90);
-      doc.text('Dirección: Tu Dirección Aquí', 50, 105);
-      doc.text('Teléfono: (809) 123-4567', 50, 120);
+      if (configuracionEmpresa?.rnc) {
+        doc.text(`RNC: ${configuracionEmpresa.rnc}`, 50, 90);
+      }
+      if (configuracionEmpresa?.direccion) {
+        doc.text(`Dirección: ${configuracionEmpresa.direccion}`, 50, 105);
+      }
+      if (configuracionEmpresa?.telefono) {
+        doc.text(`Teléfono: ${configuracionEmpresa.telefono}`, 50, 120);
+      }
+
+      // Información del conduce
       doc.fontSize(16).text('CONDUCE DE CRÉDITO', 400, 50);
       doc.fontSize(12).text(`No: ${conduce.numero}`, 400, 75);
       doc.text(`Fecha: ${conduce.fechaEmision ? conduce.fechaEmision.toLocaleDateString('es-DO') : ''}`, 400, 90);
