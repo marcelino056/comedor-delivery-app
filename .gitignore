@@ -113,3 +113,12 @@ Thumbs.db
 
 # Backup files
 backup-*.db
+
+# Archivos de backup y temporales
+*.backup
+*.backup.*
+server_*.js
+*_backup.js
+*_problematico.js
+*_simple.js
+*.current

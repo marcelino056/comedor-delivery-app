@@ -8,7 +8,7 @@ const http = require('http');
 const { initWebSocket, broadcast } = require('./services/websocket');
 
 // ================== CONEXIÓN BASE DE DATOS ==================
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/comedor', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/comedor', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
@@ -73,7 +73,7 @@ app.get('/', (req, res) => {
 // ================== INICIAR SERVIDOR Y LOGS ==================
 const PORT = process.env.PORT || 3007;
 const ENV = process.env.NODE_ENV || 'development';
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/comedor';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/comedor';
 
 const server = app.listen(PORT, () => {
   console.log('==============================================');
