@@ -15,6 +15,7 @@ const conduceSchema = new mongoose.Schema({
   subtotal: Number,
   impuesto: Number,
   total: Number,
+  esComprobanteFiscal: { type: Boolean, default: false },
   estado: { type: String, default: 'pendiente' },
   fechaCreacion: { type: Date, default: Date.now },
   fechaVencimiento: Date

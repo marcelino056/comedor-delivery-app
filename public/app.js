@@ -3019,6 +3019,7 @@ window.calcularTotalConduce = calcularTotalConduce;
 window.guardarConduce = guardarConduce;
 window.cargarConducesPendientes = cargarConducesPendientes;
 window.toggleConduceSelection = toggleConduceSelection;
+window.validateFiscalMix = validateFiscalMix;
 window.pagarCreditos = pagarCreditos;
 window.filtrarCreditos = filtrarCreditos;
 window.verConducePDF = verConducePDF;
@@ -3262,10 +3263,16 @@ async function cargarConducesPendientes() {
         } else {
             conducesList.innerHTML = conduces.map(conduce => `
                 <div class="conduce-item" onclick="toggleConduceSelection('${conduce._id}')">
-                    <input type="checkbox" id="conduce-${conduce._id}" onchange="updatePagoSummary()">
+                    <input type="checkbox" id="conduce-${conduce._id}" 
+                           data-es-fiscal="${conduce.esComprobanteFiscal || false}"
+                           onchange="validateFiscalMix(); updatePagoSummary()">
                     <div class="conduce-details">
                         <div class="conduce-numero">${conduce.numero}</div>
                         <div class="conduce-fecha">${new Date(conduce.fechaCreacion).toLocaleDateString()}</div>
+                        ${conduce.esComprobanteFiscal ? 
+                            '<div class="conduce-fiscal-badge">📄 FISCAL</div>' : 
+                            '<div class="conduce-simple-badge">🧾 SIMPLE</div>'
+                        }
                     </div>
                     <div class="conduce-total">$${conduce.total.toFixed(2)}</div>
                 </div>
@@ -3285,7 +3292,61 @@ async function cargarConducesPendientes() {
 function toggleConduceSelection(conduceId) {
     const checkbox = document.getElementById(`conduce-${conduceId}`);
     checkbox.checked = !checkbox.checked;
+    validateFiscalMix();
     updatePagoSummary();
+}
+
+// Validar que no se mezclen conduces fiscales y simples
+function validateFiscalMix() {
+    const checkboxes = document.querySelectorAll('#conduces-list-pago input[type="checkbox"]:checked');
+    const conducesFiscales = [];
+    const conducesSimples = [];
+    
+    checkboxes.forEach(checkbox => {
+        const esFiscal = checkbox.getAttribute('data-es-fiscal') === 'true';
+        if (esFiscal) {
+            conducesFiscales.push(checkbox);
+        } else {
+            conducesSimples.push(checkbox);
+        }
+    });
+    
+    // Si hay mezcla, desmarcar los últimos seleccionados
+    if (conducesFiscales.length > 0 && conducesSimples.length > 0) {
+        // Encontrar el último checkbox marcado
+        const lastChecked = Array.from(checkboxes).pop();
+        lastChecked.checked = false;
+        
+        // Mostrar advertencia
+        notify.warning('No se pueden mezclar conduces fiscales (con ITBIS) y simples (sin ITBIS) en la misma factura.');
+        
+        // Volver a validar después de desmarcar
+        setTimeout(() => {
+            validateFiscalMix();
+            updatePagoSummary();
+        }, 100);
+        
+        return false;
+    }
+    
+    // Actualizar la opción de generar factura RNC basado en el tipo de conduces
+    const generateRNCCheckbox = document.getElementById('generar-factura-rnc');
+    if (generateRNCCheckbox) {
+        if (conducesFiscales.length > 0) {
+            generateRNCCheckbox.checked = true;
+            generateRNCCheckbox.disabled = true;
+            generateRNCCheckbox.parentElement.title = 'Los conduces fiscales requieren factura con RNC';
+        } else if (conducesSimples.length > 0) {
+            generateRNCCheckbox.checked = false;
+            generateRNCCheckbox.disabled = true;
+            generateRNCCheckbox.parentElement.title = 'Los conduces simples no pueden tener RNC';
+        } else {
+            generateRNCCheckbox.disabled = false;
+            generateRNCCheckbox.parentElement.title = '';
+        }
+    }
+    
+    return true;
 }
 
 // Actualizar resumen de pago
@@ -3329,6 +3390,7 @@ async function pagarCreditos(event) {
             conducesIds,
             tipoComprobante: generarFacturaRNC ? 'FACTURA' : 'BOLETA',
             requiereRNC: generarFacturaRNC,
+            esComprobanteFiscal: generarFacturaRNC, // Esto controla si se aplican impuestos
             metodoPago: metodoPago,
             fechaEmision: state.fechaSeleccionada // YYYY-MM-DD
         };

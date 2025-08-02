@@ -133,6 +133,9 @@ module.exports = {
       
       let subtotal = 0;
       let productosParaFactura = [];
+      let conduces = []; // Definir conduces al inicio para estar disponible en todo el scope
+      let impuesto = 0;
+      let total = 0;
       
       // Caso 1: Factura desde productos individuales
       if (productos && productos.length > 0) {
@@ -141,11 +144,15 @@ module.exports = {
           subtotal += producto.total;
         });
         productosParaFactura = productos;
+        
+        // Calcular impuesto para productos individuales
+        impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
+        total = subtotal + impuesto;
       }
       // Caso 2: Factura desde conduces (pago de créditos)
       else if (conducesIds && conducesIds.length > 0) {
         const Conduce = require('../models/Conduce');
-        const conduces = await Conduce.find({ 
+        conduces = await Conduce.find({ 
           _id: { $in: conducesIds },
           cliente: clienteId,
           estado: 'pendiente'
@@ -154,6 +161,14 @@ module.exports = {
         if (conduces.length !== conducesIds.length) {
           return res.status(400).json({ error: 'Algunos conduces no son válidos o ya fueron pagados' });
         }
+        
+        // Verificar que todos los conduces tengan el mismo tipo fiscal
+        const tiposFiscales = [...new Set(conduces.map(c => Boolean(c.esComprobanteFiscal)))];
+        if (tiposFiscales.length > 1) {
+          return res.status(400).json({ error: 'No se pueden mezclar conduces fiscales y simples en la misma factura' });
+        }
+        
+        const conducesEsFiscal = Boolean(conduces[0].esComprobanteFiscal);
         
         // Agrupar productos de todos los conduces
         conduces.forEach(conduce => {
@@ -170,6 +185,18 @@ module.exports = {
         
         // Calcular total pagado de los conduces
         const totalPagado = conduces.reduce((sum, conduce) => sum + conduce.total, 0);
+        total = totalPagado;
+        
+        // Si los conduces son fiscales, el subtotal e impuesto ya están calculados
+        if (conducesEsFiscal) {
+          // Para conduces fiscales, calcular el subtotal sin impuestos
+          const subtotalSinImpuestos = totalPagado / 1.18;
+          impuesto = totalPagado - subtotalSinImpuestos;
+          
+          // Sobrescribir valores para la factura
+          subtotal = subtotalSinImpuestos;
+          console.log(`[FACTURAS] Conduces fiscales - Subtotal: ${subtotal.toFixed(2)}, Impuesto: ${impuesto.toFixed(2)}, Total: ${total.toFixed(2)}`);
+        }
         
         // Marcar conduces como pagados
         await Conduce.updateMany(
@@ -183,15 +210,12 @@ module.exports = {
           await cliente.save();
         }
         
-        console.log(`[FACTURAS] Agrupando ${conduces.length} conduces en factura. Total: ${totalPagado}`);
+        console.log(`[FACTURAS] Agrupando ${conduces.length} conduces en factura. Total: ${total}`);
       }
       else {
         return res.status(400).json({ error: 'Debe proporcionar productos o conduces para la factura' });
       }
       
-      // Solo aplicar ITBIS si es comprobante fiscal
-      const impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
-      const total = subtotal + impuesto;
       const count = await Factura.countDocuments();
       const numeroFactura = `FAC-${(count + 1).toString().padStart(6, '0')}`;
       

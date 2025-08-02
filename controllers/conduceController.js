@@ -29,7 +29,7 @@ module.exports = {
   async create(req, res) {
     try {
       console.log('[CONDUCES] Creando conduce:', req.body);
-      const { clienteId, productos, diasVencimiento } = req.body;
+      const { clienteId, productos, diasVencimiento, esComprobanteFiscal } = req.body;
       const cliente = await Cliente.findById(clienteId);
       if (!cliente) {
         console.warn('[CONDUCES][WARN] Cliente no encontrado para conduce:', clienteId);
@@ -44,7 +44,7 @@ module.exports = {
         producto.total = producto.cantidad * producto.precioUnitario;
         subtotal += producto.total;
       });
-      const impuesto = subtotal * 0.18;
+      const impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
       const total = subtotal + impuesto;
       const nuevoSaldo = cliente.saldoPendiente + total;
       if (nuevoSaldo > cliente.limiteCredito) {
@@ -62,7 +62,8 @@ module.exports = {
         subtotal,
         impuesto,
         total,
-        fechaVencimiento
+        fechaVencimiento,
+        esComprobanteFiscal: esComprobanteFiscal || false
       });
       await conduce.save();
       cliente.saldoPendiente = nuevoSaldo;

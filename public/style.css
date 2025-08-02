@@ -3093,4 +3093,23 @@ body {
     margin-top: 4px;
 }
 
+/* Badges para conduces fiscales y simples */
+.conduce-fiscal-badge {
+    font-size: 0.625rem;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
+}
+
+.conduce-simple-badge {
+    font-size: 0.625rem;
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
+}
+
 /* ============== FIN ESTILOS FACTURA DELIVERY ==============
