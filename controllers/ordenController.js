@@ -8,8 +8,13 @@ module.exports = {
       // Filtrar por fecha si se recibe ?fecha=YYYY-MM-DD
       if (req.query && req.query.fecha) {
         const fecha = req.query.fecha;
-        const start = new Date(fecha + 'T00:00:00.000Z');
-        const end = new Date(fecha + 'T23:59:59.999Z');
+        // Usar el mismo método que las ventas para consistencia con zona horaria
+        const startLocal = new Date(fecha + 'T00:00:00');
+        const endLocal = new Date(fecha + 'T23:59:59.999');
+        const start = new Date(startLocal.toISOString());
+        const end = new Date(endLocal.toISOString());
+        
+        console.log(`[ORDENES][DEBUG] Filtrando por fecha local: ${fecha}, rango UTC: ${start.toISOString()} a ${end.toISOString()}`);
         query.timestamp = { $gte: start, $lte: end };
       }
       const ordenes = await Orden.find(query);
@@ -109,15 +114,26 @@ module.exports = {
   async anular(req, res) {
     try {
       console.log(`[ORDENES] Anulando orden: ${req.params.id}`);
+      
+      // Verificar el estado actual de la orden
+      const ordenActual = await Orden.findById(req.params.id);
+      if (!ordenActual) {
+        console.warn(`[ORDENES][WARN] Orden no encontrada para anular: ${req.params.id}`);
+        return res.status(404).json({ error: 'Orden no encontrada' });
+      }
+      
+      // Validar que no se pueda anular una orden entregada
+      if (ordenActual.estado === 'entregada') {
+        console.warn(`[ORDENES][WARN] Intento de anular orden entregada: ${req.params.id}`);
+        return res.status(400).json({ error: 'No se puede anular una orden que ya fue entregada' });
+      }
+      
       const orden = await Orden.findByIdAndUpdate(
         req.params.id,
         { anulada: true },
         { new: true }
       );
-      if (!orden) {
-        console.warn(`[ORDENES][WARN] Orden no encontrada para anular: ${req.params.id}`);
-        return res.status(404).json({ error: 'Orden no encontrada' });
-      }
+      
       console.log('[ORDENES] Orden anulada:', orden._id);
       res.json(orden);
     } catch (error) {
@@ -130,15 +146,26 @@ module.exports = {
     try {
       console.log(`[ORDENES] Cambiando estado de orden: ${req.params.id}`, req.body);
       const { estado } = req.body;
+      
+      // Verificar el estado actual de la orden
+      const ordenActual = await Orden.findById(req.params.id);
+      if (!ordenActual) {
+        console.warn(`[ORDENES][WARN] Orden no encontrada para cambiar estado: ${req.params.id}`);
+        return res.status(404).json({ error: 'Orden no encontrada' });
+      }
+      
+      // Validar que no se pueda cambiar el estado de una orden entregada
+      if (ordenActual.estado === 'entregada') {
+        console.warn(`[ORDENES][WARN] Intento de cambiar estado de orden entregada: ${req.params.id}`);
+        return res.status(400).json({ error: 'No se puede cambiar el estado de una orden entregada' });
+      }
+      
       const orden = await Orden.findByIdAndUpdate(
         req.params.id,
         { estado },
         { new: true }
       );
-      if (!orden) {
-        console.warn(`[ORDENES][WARN] Orden no encontrada para cambiar estado: ${req.params.id}`);
-        return res.status(404).json({ error: 'Orden no encontrada' });
-      }
+      
       console.log('[ORDENES] Estado de orden cambiado:', orden._id, 'nuevo estado:', estado);
       res.json(orden);
     } catch (error) {
@@ -151,15 +178,26 @@ module.exports = {
     try {
       console.log(`[ORDENES] Cambiando método de pago de orden: ${req.params.id}`, req.body);
       const { metodoPago } = req.body;
+      
+      // Verificar el estado actual de la orden
+      const ordenActual = await Orden.findById(req.params.id);
+      if (!ordenActual) {
+        console.warn(`[ORDENES][WARN] Orden no encontrada para cambiar método de pago: ${req.params.id}`);
+        return res.status(404).json({ error: 'Orden no encontrada' });
+      }
+      
+      // Validar que no se pueda cambiar el método de pago de una orden entregada
+      if (ordenActual.estado === 'entregada') {
+        console.warn(`[ORDENES][WARN] Intento de cambiar método de pago de orden entregada: ${req.params.id}`);
+        return res.status(400).json({ error: 'No se puede cambiar el método de pago de una orden entregada' });
+      }
+      
       const orden = await Orden.findByIdAndUpdate(
         req.params.id,
         { metodoPago },
         { new: true }
       );
-      if (!orden) {
-        console.warn(`[ORDENES][WARN] Orden no encontrada para cambiar método de pago: ${req.params.id}`);
-        return res.status(404).json({ error: 'Orden no encontrada' });
-      }
+      
       console.log('[ORDENES] Método de pago de orden cambiado:', orden._id, 'nuevo método:', metodoPago);
       res.json(orden);
     } catch (error) {

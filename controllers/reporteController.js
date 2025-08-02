@@ -3,6 +3,8 @@ const MontoInicial = require('../models/MontoInicial');
 const Venta = require('../models/Venta');
 const Gasto = require('../models/Gasto');
 const Orden = require('../models/Orden');
+const Conduce = require('../models/Conduce');
+const Factura = require('../models/Factura');
 const ConfiguracionEmpresa = require('../models/ConfiguracionEmpresa');
 const path = require('path');
 const fs = require('fs');
@@ -129,6 +131,65 @@ function generateReportHTML(data, configuracionEmpresa) {
         </div>
     </div>
 
+    ${data.conduces && data.conduces.length > 0 ? `
+    <div class="section">
+        <h2>Ventas a Crédito (${data.conduces.length})</h2>
+        <div style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #007bff;">
+            <strong>Total en Crédito: ${formatCurrency(data.totalCreditos || 0)}</strong>
+        </div>
+        ${data.conduces.map(conduce => `
+            <div class="transaction-item" style="border-left: 3px solid #ffc107; background-color: #fff9e6;">
+                <span><strong>Conduce:</strong> ${conduce.numero}</span>
+                <span class="amount" style="color: #856404;">${formatCurrency(conduce.total)}</span>
+                <br><small><strong>Cliente:</strong> ${conduce.cliente} | <strong>Estado:</strong> ${conduce.estado}</small>
+                ${conduce.productos && conduce.productos.length > 0 ? `
+                    <div style="margin-top: 8px; font-size: 0.9em; color: #666;">
+                        <strong>Productos:</strong>
+                        ${conduce.productos.map(p => `${p.cantidad}x ${p.descripcion} (${formatCurrency(p.total)})`).join(', ')}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('')}
+    </div>
+    ` : ''}
+
+    ${data.facturas && data.facturas.length > 0 ? `
+    <div class="section">
+        <h2>Facturas del Día (${data.facturas.length})</h2>
+        <div style="margin-bottom: 15px; padding: 10px; background-color: #e8f5e8; border-left: 4px solid #28a745;">
+            <strong>Total Facturado: ${formatCurrency(data.totalFacturas || 0)}</strong>
+            <small style="display: block; margin-top: 5px; color: #666;">
+                ✅ Estas facturas YA están incluidas en los totales de métodos de pago
+            </small>
+        </div>
+        ${data.facturas.map(factura => `
+            <div class="transaction-item" style="border-left: 3px solid #28a745; background-color: #f8fff8;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <span><strong>Factura:</strong> ${factura.numero}</span>
+                        <span style="margin-left: 10px; padding: 2px 6px; background-color: ${factura.tipoComprobante === 'FACTURA' ? '#007bff' : '#6c757d'}; color: white; border-radius: 3px; font-size: 0.8em;">
+                            ${factura.tipoComprobante}
+                        </span>
+                        ${factura.rnc ? `<span style="margin-left: 5px; color: #007bff; font-size: 0.9em;">📋 RNC</span>` : ''}
+                    </div>
+                    <span class="amount positive">${formatCurrency(factura.total)}</span>
+                </div>
+                <br><small>
+                    <strong>Cliente:</strong> ${factura.cliente} | 
+                    <strong>Método:</strong> ${factura.metodoPago} | 
+                    <strong>Fecha:</strong> ${formatDateTime(factura.fechaEmision)}
+                </small>
+                ${factura.productos && factura.productos.length > 0 ? `
+                    <div style="margin-top: 8px; font-size: 0.9em; color: #666;">
+                        <strong>Productos:</strong>
+                        ${factura.productos.slice(0, 3).map(p => `${p.cantidad}x ${p.descripcion}`).join(', ')}${factura.productos.length > 3 ? ` (+${factura.productos.length - 3} más)` : ''}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('')}
+    </div>
+    ` : ''}
+
     <div class="section">
         <h2>Gastos del Día</h2>
         ${data.gastos.map(gasto => `
@@ -165,6 +226,7 @@ module.exports = {
   async diario(req, res) {
     try {
       const fecha = req.params.fecha;
+      const datosAdicionales = req.body; // Datos enviados desde el frontend
       console.log(`[REPORTE] Generando reporte diario para la fecha: ${fecha}`);
       
       // Convertir fecha local a rango UTC para consultas (igual que en gastoController)
@@ -175,8 +237,8 @@ module.exports = {
       
       console.log(`[REPORTE] Consultando datos entre ${start.toISOString()} y ${end.toISOString()}`);
       
-      // Obtener datos en paralelo incluyendo configuración de empresa
-      const [ventas, gastos, ordenes, montoInicialDoc, configuracionEmpresa] = await Promise.all([
+      // Obtener datos en paralelo incluyendo conduces, facturas y configuración de empresa
+      const [ventas, gastos, ordenes, conduces, facturas, montoInicialDoc, configuracionEmpresa] = await Promise.all([
         Venta.find({ 
           fecha: { $gte: start, $lte: end },
           estado: { $ne: 'anulada' }
@@ -191,6 +253,15 @@ module.exports = {
           anulada: { $ne: true }
         }),
         
+        Conduce.find({ 
+          fechaCreacion: { $gte: start, $lte: end }
+        }).populate('cliente', 'nombre'),
+        
+        Factura.find({ 
+          fechaEmision: { $gte: start, $lte: end },
+          anulada: { $ne: true }
+        }).populate('cliente', 'nombre'),
+        
         MontoInicial.findOne({ fecha }),
         
         ConfiguracionEmpresa.findOne().catch(error => {
@@ -204,26 +275,28 @@ module.exports = {
         })
       ]);
       
-      console.log(`[REPORTE] Datos encontrados: ${ventas.length} ventas, ${gastos.length} gastos, ${ordenes.length} órdenes`);
+      console.log(`[REPORTE] Datos encontrados: ${ventas.length} ventas, ${gastos.length} gastos, ${ordenes.length} órdenes, ${conduces.length} conduces, ${facturas.length} facturas`);
       
       // Calcular totales
       const totalVentasLocal = ventas.reduce((sum, venta) => sum + (venta.total || 0), 0);
       const totalVentasDelivery = ordenes.reduce((sum, orden) => sum + (orden.total || 0), 0);
-      const totalVentas = totalVentasLocal + totalVentasDelivery;
+      const totalCreditos = conduces.reduce((sum, conduce) => sum + (conduce.total || 0), 0);
+      const totalFacturas = facturas.reduce((sum, factura) => sum + (factura.total || 0), 0);
+      const totalVentas = totalVentasLocal + totalVentasDelivery + totalFacturas; // Incluir facturas en el total
       const totalGastos = gastos.reduce((sum, gasto) => sum + (gasto.monto || 0), 0);
       const montoInicial = montoInicialDoc ? montoInicialDoc.monto : 0;
       const ganancia = totalVentas - totalGastos;
       
-      // Calcular desglose por método de pago
-      const ventasEfectivo = [...ventas, ...ordenes]
+      // Calcular desglose por método de pago (incluir facturas)
+      const ventasEfectivo = [...ventas, ...ordenes, ...facturas]
         .filter(item => item.metodoPago === 'efectivo')
         .reduce((sum, item) => sum + (item.total || 0), 0);
       
-      const ventasTarjeta = [...ventas, ...ordenes]
+      const ventasTarjeta = [...ventas, ...ordenes, ...facturas]
         .filter(item => item.metodoPago === 'tarjeta')
         .reduce((sum, item) => sum + (item.total || 0), 0);
       
-      const ventasTransferencia = [...ventas, ...ordenes]
+      const ventasTransferencia = [...ventas, ...ordenes, ...facturas]
         .filter(item => item.metodoPago === 'transferencia')
         .reduce((sum, item) => sum + (item.total || 0), 0);
       
@@ -248,8 +321,28 @@ module.exports = {
           metodoPago: o.metodoPago || 'efectivo',
           timestamp: o.timestamp
         })),
+        conduces: conduces.map(c => ({
+          numero: c.numero,
+          cliente: c.cliente?.nombre || 'Cliente no especificado',
+          total: c.total || 0,
+          estado: c.estado,
+          productos: c.productos || []
+        })),
+        facturas: facturas.map(f => ({
+          numero: f.numero,
+          cliente: f.cliente?.nombre || 'Cliente no especificado',
+          total: f.total || 0,
+          subtotal: f.subtotal || 0,
+          tipoComprobante: f.tipoComprobante || 'BOLETA',
+          metodoPago: f.metodoPago || 'transferencia',
+          fechaEmision: f.fechaEmision,
+          rnc: f.rnc || null,
+          productos: f.productos || []
+        })),
         totalVentas,
         totalGastos,
+        totalCreditos,
+        totalFacturas,
         ganancia,
         montoInicial,
         ventasEfectivo,
@@ -257,7 +350,7 @@ module.exports = {
         ventasTransferencia,
         ventasLocales: ventas.length,
         delivery: ordenes.length,
-        totalTransacciones: ventas.length + ordenes.length
+        totalTransacciones: ventas.length + ordenes.length + facturas.length
       };
       
       console.log(`[REPORTE] Resumen: Ingresos: ${totalVentas}, Gastos: ${totalGastos}, Ganancia: ${ganancia}`);

@@ -1,6 +1,22 @@
 // Función helper para obtener fecha local en formato YYYY-MM-DD
 // Última actualización: 2025-08-01 22:55 - Fix WebSocket + debugging modal
 function getLocalDateString(date = new Date()) {
+    // Si ya es un string en formato YYYY-MM-DD, devolverlo tal como está
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return date;
+    }
+    
+    // Si es un timestamp o string de fecha, convertir a objeto Date
+    if (typeof date === 'string' || typeof date === 'number') {
+        date = new Date(date);
+    }
+    
+    // Verificar que es un objeto Date válido
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+        console.error('[getLocalDateString] Fecha inválida recibida:', date);
+        return new Date().toISOString().split('T')[0]; // Fallback a hoy
+    }
+    
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -15,6 +31,7 @@ let state = {
     montoInicial: {},
     clientes: [],
     facturas: [],
+    conduces: [],
     configuracionesRNC: [],
     configuracionEmpresa: {},
     activeTab: localStorage.getItem('activeTab') || 'ventas', // Recuperar tab guardado o usar ventas por defecto
@@ -125,22 +142,34 @@ function irAHoy() {
 
 // Cargar datos para la fecha seleccionada
 async function cargarDatosFecha() {
+    console.log('[DEBUG] === CARGANDO DATOS PARA FECHA:', state.fechaSeleccionada, '===');
     showLoading(true);
     try {
-        const [ventasRes, ordenesRes, gastosRes] = await Promise.all([
+        const [ventasRes, ordenesRes, gastosRes, conducesRes] = await Promise.all([
             fetch(`${API_BASE}/ventas?fecha=${state.fechaSeleccionada}`),
             fetch(`${API_BASE}/ordenes?fecha=${state.fechaSeleccionada}`),
-            fetch(`${API_BASE}/gastos?fecha=${state.fechaSeleccionada}`)
+            fetch(`${API_BASE}/gastos?fecha=${state.fechaSeleccionada}`),
+            fetch(`${API_BASE}/conduces`)
         ]);
 
         state.ventas = await ventasRes.json();
         state.ordenes = await ordenesRes.json();
         state.gastos = await gastosRes.json();
+        state.conduces = await conducesRes.json();
+
+        console.log('[DEBUG] Datos cargados:', {
+            ventas: state.ventas.length,
+            ordenes: state.ordenes.length,
+            gastos: state.gastos.length,
+            conduces: state.conduces.length
+        });
 
         // Cargar monto inicial para la fecha seleccionada
         const montoRes = await fetch(`${API_BASE}/monto-inicial/${state.fechaSeleccionada}`);
         const montoData = await montoRes.json();
         state.montoInicial[state.fechaSeleccionada] = montoData.monto;
+
+        console.log('[DEBUG] Monto inicial cargado:', montoData.monto);
 
         // Actualizar todas las vistas
         updateAllViews();
@@ -863,24 +892,48 @@ async function submitMontoInicial() {
 async function anularVenta(id) {
     if (!confirm('¿Estás seguro de anular esta venta?')) return;
 
+    console.log('[FRONTEND] Anulando venta:', id);
     showLoading(true);
     try {
         const response = await fetch(`${API_BASE}/ventas/${id}/anular`, {
-            method: 'PUT'
+            method: 'PUT', // Usar PUT que es más correcto para actualizaciones
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
+        console.log('[FRONTEND] Respuesta de anular venta:', response.status);
+
         if (!response.ok) {
-            throw new Error('Error al anular venta');
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.error || `Error ${response.status}: ${response.statusText}`;
+            throw new Error(errorMessage);
         }
+
+        const ventaAnulada = await response.json();
+        console.log('[FRONTEND] Venta anulada exitosamente:', ventaAnulada._id);
+        
+        // Recargar datos para reflejar los cambios
+        await cargarDatosFecha(state.fechaSeleccionada);
+        
+        showNotification('Venta anulada exitosamente', 'success');
+        
     } catch (error) {
-        console.error('Error:', error);
-        alert('Error al anular la venta');
+        console.error('[FRONTEND] Error al anular venta:', error);
+        showNotification(`Error al anular la venta: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }
 }
 
 async function anularOrden(id) {
+    // Validar que la orden no esté entregada
+    const orden = state.ordenes.find(o => o._id === id);
+    if (orden && orden.estado === 'entregada') {
+        showNotification('No se puede anular una orden que ya fue entregada', 'warning');
+        return;
+    }
+
     if (!confirm('¿Estás seguro de anular esta orden?')) return;
 
     showLoading(true);
@@ -890,7 +943,8 @@ async function anularOrden(id) {
         });
 
         if (!response.ok) {
-            throw new Error('Error al anular orden');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Error al anular orden');
         }
         
         // Recargar datos después del cambio
@@ -904,6 +958,20 @@ async function anularOrden(id) {
 }
 
 async function cambiarEstadoOrden(id, estado) {
+    // Validar que la orden no esté ya entregada
+    const orden = state.ordenes.find(o => o._id === id);
+    if (orden && orden.estado === 'entregada') {
+        showNotification('No se puede cambiar el estado de una orden entregada', 'warning');
+        return;
+    }
+
+    // Confirmar si se está marcando como entregada
+    if (estado === 'entregada') {
+        if (!confirm('¿Confirmar entrega? Una vez entregada no se podrá cambiar el estado.')) {
+            return;
+        }
+    }
+
     showLoading(true);
     try {
         const response = await fetch(`${API_BASE}/ordenes/${id}/estado`, {
@@ -913,20 +981,32 @@ async function cambiarEstadoOrden(id, estado) {
         });
 
         if (!response.ok) {
-            throw new Error('Error al cambiar estado');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Error al cambiar estado');
         }
         
         // Recargar datos después del cambio
         await cargarDatosFecha();
+        
+        if (estado === 'entregada') {
+            showNotification('Orden marcada como entregada exitosamente', 'success');
+        }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error al cambiar el estado');
+        showNotification(`Error al cambiar el estado: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }
 }
 
 async function cambiarMetodoPagoOrden(id, metodoPago) {
+    // Validar que la orden no esté entregada
+    const orden = state.ordenes.find(o => o._id === id);
+    if (orden && orden.estado === 'entregada') {
+        showNotification('No se puede cambiar el método de pago de una orden entregada', 'warning');
+        return;
+    }
+
     showLoading(true);
     try {
         const response = await fetch(`${API_BASE}/ordenes/${id}/metodoPago`, {
@@ -936,14 +1016,15 @@ async function cambiarMetodoPagoOrden(id, metodoPago) {
         });
 
         if (!response.ok) {
-            throw new Error('Error al cambiar método de pago');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Error al cambiar método de pago');
         }
         
         // Recargar datos después del cambio
         await cargarDatosFecha();
     } catch (error) {
         console.error('Error:', error);
-        alert('Error al cambiar el método de pago');
+        showNotification(`Error al cambiar el método de pago: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }
@@ -1042,7 +1123,7 @@ function updateVentasView() {
                     <div class="item-meta">
                         <span class="status-badge">Venta Local</span>
                         ${!venta.anulada && fechaEsHoy ? `
-                            <button class="delete-btn" onclick="anularVenta(${venta.id})" title="Anular venta">
+                            <button class="delete-btn" onclick="anularVenta('${venta._id}')" title="Anular venta">
                                 🗑️
                             </button>
                         ` : ''}
@@ -1093,7 +1174,7 @@ function updateOrdenesView() {
                         <p>🚚 Delivery: ${formatCurrency(orden.costoDelivery)}</p>
                         <p class="total">💵 Total: ${formatCurrency(orden.total)}</p>
                     </div>
-                    ${!orden.anulada && fechaEsHoy ? `
+                    ${!orden.anulada && fechaEsHoy && orden.estado !== 'entregada' ? `
                         <div class="payment-buttons">
                             <button class="payment-btn efectivo ${orden.metodoPago === 'efectivo' ? 'active' : ''}" 
                                     onclick="cambiarMetodoPagoOrden('${orden._id}', 'efectivo')">
@@ -1123,13 +1204,13 @@ function updateOrdenesView() {
                         <span style="font-size: 0.75rem; font-weight: 600; color: #3b82f6;">
                             ${orden.repartidor}
                         </span>
-                        ${!orden.anulada && fechaEsHoy ? `
+                        ${!orden.anulada && fechaEsHoy && orden.estado !== 'entregada' ? `
                             <button class="delete-btn" onclick="anularOrden('${orden._id}')" title="Anular orden">
                                 🗑️
                             </button>
                         ` : ''}
                     </div>
-                    ${!orden.anulada && fechaEsHoy ? `
+                    ${!orden.anulada && fechaEsHoy && orden.estado !== 'entregada' ? `
                         <div class="state-buttons">
                             <button class="state-btn recibida ${orden.estado === 'recibida' ? 'active' : ''}"
                                     onclick="cambiarEstadoOrden('${orden._id}', 'recibida')">
@@ -1147,6 +1228,15 @@ function updateOrdenesView() {
                                     onclick="cambiarEstadoOrden('${orden._id}', 'entregada')">
                                 Entregada
                             </button>
+                        </div>
+                    ` : !orden.anulada && fechaEsHoy && orden.estado === 'entregada' ? `
+                        <div class="state-display-final">
+                            <span style="font-size: 0.75rem; color: #10b981; background-color: #d1fae5; border: 1px solid #10b981; border-radius: 0.25rem; padding: 0.25rem 0.5rem; font-weight: 600;">
+                                ✅ ENTREGADA (FINAL)
+                            </span>
+                            <small style="display: block; color: #6b7280; font-size: 0.625rem; margin-top: 0.25rem;">
+                                Estado final - No se puede modificar
+                            </small>
                         </div>
                     ` : !orden.anulada ? `
                         <div class="state-display">
@@ -1226,13 +1316,15 @@ function sortOrdenes(ordenes) {
 }
 
 function updateCajaView() {
+    console.log('[DEBUG] === ACTUALIZANDO VISTA DE CAJA ===');
     const totales = calcularTotalesDia();
+    console.log('[DEBUG] Totales recibidos:', totales);
     
     // Actualizar resumen principal
     document.getElementById('monto-inicial-display').textContent = formatCurrency(totales.montoInicial);
     document.getElementById('monto-inicial-detail').textContent = totales.montoInicial === 0 ? 'Sin establecer' : '';
     document.getElementById('ventas-totales').textContent = formatCurrency(totales.totalVentas);
-    document.getElementById('transacciones-total').textContent = `${totales.totalTransacciones} transacciones`;
+    document.getElementById('transacciones-total').textContent = `${totales.ventasLocales} locales, ${totales.delivery} delivery, ${totales.facturas} facturas`;
     document.getElementById('gastos-totales').textContent = formatCurrency(totales.totalGastos);
     document.getElementById('ganancia-total').textContent = formatCurrency(totales.ganancia);
 
@@ -1247,11 +1339,17 @@ function updateCajaView() {
     document.getElementById('total-general').textContent = formatCurrency(totales.totalVentas);
     document.getElementById('ganancia-neta').textContent = formatCurrency(totales.ganancia);
 
+    // Actualizar créditos creados
+    document.getElementById('creditos-creados-total').textContent = formatCurrency(totales.creditosCreados);
+    document.getElementById('detail-conduces-count').textContent = `${totales.conducesCreados} conduces`;
+
     // Mostrar/ocultar notas
     const tarjetaNote = document.getElementById('tarjeta-note');
     const transferenciaNote = document.getElementById('transferencia-note');
+    const creditosNote = document.getElementById('creditos-note');
     tarjetaNote.style.display = totales.ventasTarjeta > 0 ? 'block' : 'none';
     transferenciaNote.style.display = totales.ventasTransferencia > 0 ? 'block' : 'none';
+    creditosNote.style.display = totales.creditosCreados > 0 ? 'block' : 'none';
 
     // Mostrar/ocultar botón monto inicial
     const btnMontoInicial = document.getElementById('btn-monto-inicial');
@@ -1299,14 +1397,14 @@ function updateGastosList() {
 
 function calcularTotalesDia() {
     const fechaSeleccionada = state.fechaSeleccionada; // YYYY-MM-DD format
-    
-    // Función helper para convertir UTC a fecha local
-    function getLocalDateString(timestamp) {
-        const date = new Date(timestamp);
-        return date.getFullYear() + '-' + 
-               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-               String(date.getDate()).padStart(2, '0');
-    }
+    console.log('[DEBUG] === CALCULANDO TOTALES PARA:', fechaSeleccionada, '===');
+    console.log('[DEBUG] Estado actual:', {
+        ventas: state.ventas?.length || 0,
+        ordenes: state.ordenes?.length || 0,
+        facturas: state.facturas?.length || 0,
+        conduces: state.conduces?.length || 0,
+        gastos: state.gastos?.length || 0
+    });
     
     const ventasFecha = state.ventas.filter(v => 
         getLocalDateString(v.timestamp) === fechaSeleccionada && !v.anulada
@@ -1320,11 +1418,53 @@ function calcularTotalesDia() {
         getLocalDateString(o.timestamp) === fechaSeleccionada && !o.anulada
     );
 
+    // Filtrar créditos (conduces) creados en la fecha seleccionada
+    // NOTA: Los conduces pueden tener fechaCreacion (del backend) o createdAt
+    // Se filtra por fecha de creación convertida a formato local YYYY-MM-DD
+    const conducesFecha = (state.conduces || []).filter(c => {
+        // Verificar si tiene fechaCreacion (del backend) o createdAt
+        const fechaCreacion = c.fechaCreacion || c.createdAt;
+        if (!fechaCreacion) return false;
+        return getLocalDateString(fechaCreacion) === fechaSeleccionada;
+    });
+
+    // Filtrar facturas por fecha de emisión
+    const facturasFecha = (state.facturas || []).filter(f => {
+        if (!f.fechaEmision || f.anulada) return false;
+        return getLocalDateString(f.fechaEmision) === fechaSeleccionada;
+    });
+
+    console.log('[DEBUG] Datos filtrados por fecha:', {
+        ventasFecha: ventasFecha.length,
+        ordenesFecha: ordenesFecha.length,
+        facturasFecha: facturasFecha.length,
+        conducesFecha: conducesFecha.length,
+        gastosFecha: gastosFecha.length
+    });
+
+    // Mostrar ejemplos de fechas para debug
+    if (state.ventas.length > 0) {
+        console.log('[DEBUG] Ejemplo fecha venta:', getLocalDateString(state.ventas[0].timestamp), 'vs', fechaSeleccionada);
+    }
+
     const totalVentasLocal = ventasFecha.reduce((sum, venta) => sum + venta.monto, 0);
     const totalVentasDelivery = ordenesFecha.reduce((sum, orden) => sum + orden.total, 0);
-    const totalVentas = totalVentasLocal + totalVentasDelivery;
+    const totalFacturas = facturasFecha.reduce((sum, factura) => sum + factura.subtotal, 0);
+    // Calcular total de créditos creados en el día (suma de totales de conduces)
+    const totalCreditosCreados = conducesFecha.reduce((sum, conduce) => sum + conduce.total, 0);
+    // Total de ventas = ventas locales + delivery + facturas (NO incluye créditos ya que son ventas pendientes)
+    const totalVentas = totalVentasLocal + totalVentasDelivery + totalFacturas;
     const totalGastos = gastosFecha.reduce((sum, gasto) => sum + gasto.monto, 0);
-    const totalTransacciones = ventasFecha.length + ordenesFecha.length;
+    const totalTransacciones = ventasFecha.length + ordenesFecha.length + facturasFecha.length;
+
+    console.log('[DEBUG] Totales calculados:', {
+        totalVentasLocal,
+        totalVentasDelivery,
+        totalFacturas,
+        totalVentas,
+        totalGastos,
+        totalTransacciones
+    });
     
     // Calcular ventas por método de pago
     const ventasEfectivo = ventasFecha
@@ -1332,21 +1472,30 @@ function calcularTotalesDia() {
         .reduce((sum, item) => sum + item.monto, 0) +
         ordenesFecha
         .filter(item => item.metodoPago === 'efectivo')
-        .reduce((sum, item) => sum + item.total, 0);
+        .reduce((sum, item) => sum + item.total, 0) +
+        facturasFecha
+        .filter(item => item.metodoPago === 'efectivo')
+        .reduce((sum, item) => sum + item.subtotal, 0);
     
     const ventasTarjeta = ventasFecha
         .filter(item => item.metodoPago === 'tarjeta')
         .reduce((sum, item) => sum + item.monto, 0) +
         ordenesFecha
         .filter(item => item.metodoPago === 'tarjeta')
-        .reduce((sum, item) => sum + item.total, 0);
+        .reduce((sum, item) => sum + item.total, 0) +
+        facturasFecha
+        .filter(item => item.metodoPago === 'tarjeta')
+        .reduce((sum, item) => sum + item.subtotal, 0);
     
     const ventasTransferencia = ventasFecha
         .filter(item => item.metodoPago === 'transferencia')
         .reduce((sum, item) => sum + item.monto, 0) +
         ordenesFecha
         .filter(item => item.metodoPago === 'transferencia')
-        .reduce((sum, item) => sum + item.total, 0);
+        .reduce((sum, item) => sum + item.total, 0) +
+        facturasFecha
+        .filter(item => item.metodoPago === 'transferencia')
+        .reduce((sum, item) => sum + item.subtotal, 0);
     
     // Monto inicial del día seleccionado
     const montoInicial = state.montoInicial[state.fechaSeleccionada] || 0;
@@ -1361,11 +1510,14 @@ function calcularTotalesDia() {
         ganancia: totalVentas - totalGastos,
         ventasLocales: ventasFecha.length,
         delivery: ordenesFecha.length,
+        facturas: facturasFecha.length,
         montoInicial,
         ventasEfectivo,
         ventasTarjeta,
         ventasTransferencia,
-        efectivoEsperado
+        efectivoEsperado,
+        creditosCreados: totalCreditosCreados,
+        conducesCreados: conducesFecha.length
     };
 }
 
@@ -1690,11 +1842,77 @@ async function generarReporteDiario() {
         const fechaReporte = state.fechaSeleccionada || getLocalDateString();
         console.log('Generando reporte para fecha:', fechaReporte);
         
-        const response = await fetch(`${API_BASE}/reporte/diario/${fechaReporte}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/pdf'
+        // Obtener datos de conduces y facturas para incluir en el reporte
+        let conducesCredito = [];
+        let facturasDelDia = [];
+        
+        try {
+            // Cargar conduces
+            const conducesResponse = await fetch(`${API_BASE}/conduces?fecha=${fechaReporte}`);
+            if (conducesResponse.ok) {
+                const todosConduces = await conducesResponse.json();
+                // Filtrar solo los conduces del día actual
+                conducesCredito = todosConduces.filter(conduce => {
+                    const fechaConduce = getLocalDateString(new Date(conduce.fechaCreacion));
+                    return fechaConduce === fechaReporte;
+                });
+                console.log(`Conduces encontrados para ${fechaReporte}:`, conducesCredito.length);
             }
+            
+            // Cargar facturas
+            const facturasResponse = await fetch(`${API_BASE}/facturas?fecha=${fechaReporte}`);
+            if (facturasResponse.ok) {
+                const todasFacturas = await facturasResponse.json();
+                // Filtrar solo las facturas del día actual
+                facturasDelDia = todasFacturas.filter(factura => {
+                    const fechaFactura = getLocalDateString(new Date(factura.fechaEmision));
+                    return fechaFactura === fechaReporte && !factura.anulada;
+                });
+                console.log(`Facturas encontradas para ${fechaReporte}:`, facturasDelDia.length);
+            }
+        } catch (error) {
+            console.warn('Error cargando datos adicionales para reporte:', error);
+        }
+        
+        // Preparar datos para el reporte incluyendo conduces y facturas
+        const datosReporte = {
+            fecha: fechaReporte,
+            incluirConduces: true,
+            incluirFacturas: true,
+            conduces: conducesCredito.map(conduce => ({
+                numero: conduce.numero,
+                cliente: conduce.cliente.nombre,
+                total: conduce.total,
+                estado: conduce.estado,
+                productos: conduce.productos.map(p => ({
+                    descripcion: p.descripcion,
+                    cantidad: p.cantidad,
+                    precio: p.precioUnitario,
+                    total: p.total
+                }))
+            })),
+            facturas: facturasDelDia.map(factura => ({
+                numero: factura.numero,
+                cliente: factura.cliente?.nombre || 'Cliente no especificado',
+                total: factura.total,
+                subtotal: factura.subtotal,
+                tipoComprobante: factura.tipoComprobante,
+                metodoPago: factura.metodoPago,
+                fechaEmision: factura.fechaEmision,
+                rnc: factura.rnc,
+                productos: factura.productos || []
+            }))
+        };
+        
+        console.log('Enviando datos al servidor:', datosReporte);
+        
+        const response = await fetch(`${API_BASE}/reporte/diario/${fechaReporte}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/pdf',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(datosReporte)
         });
         
         console.log('Response status:', response.status);
@@ -2026,7 +2244,9 @@ async function generarFactura(event) {
         
         const clienteId = document.getElementById('factura-cliente').value;
         const tipoComprobante = document.getElementById('factura-tipo').value;
+        const metodoPago = document.getElementById('factura-metodo-pago').value;
         const requiereRNC = document.getElementById('requiere-rnc').checked;
+        const esComprobanteFiscal = document.getElementById('factura-comprobante-fiscal').checked;
         
         // Recopilar productos
         const productos = [];
@@ -2058,7 +2278,9 @@ async function generarFactura(event) {
             body: JSON.stringify({
                 clienteId,
                 tipoComprobante,
+                metodoPago,
                 requiereRNC,
+                esComprobanteFiscal,
                 productos
             })
         });
@@ -2070,9 +2292,16 @@ async function generarFactura(event) {
 
         const factura = await response.json();
         
-        // Actualizar lista
-        state.facturas.unshift(factura);
-        updateFacturasView();
+        // El WebSocket debería manejar la actualización automáticamente
+        // Pero verificamos si existe la factura después de un breve delay para garantizar consistencia
+        setTimeout(() => {
+            const facturaExiste = state.facturas.some(f => f._id === factura._id);
+            if (!facturaExiste) {
+                console.log('[FACTURA] WebSocket no actualizó, agregando manualmente...');
+                state.facturas.unshift(factura);
+                updateFacturasView();
+            }
+        }, 500);
         
         closeModal();
         showLoading(false);
@@ -2233,7 +2462,9 @@ function calcularTotalesFactura() {
         subtotal += parseFloat(input.value) || 0;
     });
     
-    const impuesto = subtotal * 0.18;
+    // Solo aplicar ITBIS si está marcado como comprobante fiscal
+    const esComprobanteFiscal = document.getElementById('factura-comprobante-fiscal').checked;
+    const impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
     const total = subtotal + impuesto;
     
     document.getElementById('factura-subtotal').textContent = `$${subtotal.toFixed(2)}`;
@@ -2540,7 +2771,9 @@ function calcularTotalConduce() {
         subtotal += totalProducto;
     });
     
-    const impuesto = subtotal * 0.18;
+    // Solo aplicar ITBIS si está marcado como comprobante fiscal
+    const esComprobanteFiscal = document.getElementById('conduce-comprobante-fiscal').checked;
+    const impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
     const total = subtotal + impuesto;
     
     document.getElementById('conduce-subtotal').textContent = `$${subtotal.toFixed(2)}`;
@@ -2585,6 +2818,7 @@ async function guardarConduce(event) {
     
     const formData = new FormData(event.target);
     const clienteId = formData.get('conduce-cliente') || document.getElementById('conduce-cliente').value;
+    const esComprobanteFiscal = document.getElementById('conduce-comprobante-fiscal').checked;
     
     const productos = [];
     const productosItems = document.querySelectorAll('#productos-conduce .producto-item');
@@ -2611,7 +2845,8 @@ async function guardarConduce(event) {
     
     const conduceData = {
         clienteId,
-        productos
+        productos,
+        esComprobanteFiscal
     };
     
     try {
@@ -2717,8 +2952,9 @@ async function pagarCreditos(event) {
         const clienteId = document.getElementById('pago-cliente').value;
         const checkboxes = document.querySelectorAll('#conduces-list-pago input[type="checkbox"]:checked');
         const generarFacturaRNC = document.getElementById('generar-factura-rnc').checked;
+        const metodoPago = document.getElementById('metodo-pago-conduce').value;
         const conducesIds = Array.from(checkboxes).map(cb => cb.id.replace('conduce-', ''));
-        console.log('Datos del pago:', { clienteId, conducesIds, generarFacturaRNC });
+        console.log('Datos del pago:', { clienteId, conducesIds, generarFacturaRNC, metodoPago });
         if (conducesIds.length === 0) {
             showNotification('Debe seleccionar al menos un conduce', 'error');
             if (btn) btn.disabled = false;
@@ -2731,6 +2967,7 @@ async function pagarCreditos(event) {
             conducesIds,
             tipoComprobante: generarFacturaRNC ? 'FACTURA' : 'BOLETA',
             requiereRNC: generarFacturaRNC,
+            metodoPago: metodoPago,
             fechaEmision: state.fechaSeleccionada // YYYY-MM-DD
         };
         console.log('Enviando datos al servidor:', facturaData);
@@ -2764,7 +3001,8 @@ async function pagarCreditos(event) {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         await loadCreditos();
-        await cargarFacturas();
+        // No recargar facturas aquí ya que el WebSocket ya debería haberlo hecho
+        // await cargarFacturas();
         console.log('[PAGO-CREDITOS] Datos recargados exitosamente');
         // Preguntar si quiere descargar la factura
         if (factura && factura._id && confirm('¿Desea descargar la factura en PDF?')) {
@@ -3119,12 +3357,6 @@ async function setupPagarCreditosModal() {
     } catch (error) {
         console.error('[CREDITOS] Error configurando modal de pagar créditos:', error);
         showNotification('Error cargando clientes: ' + error.message, 'error');
-    }
-}
-        
-    } catch (error) {
-        console.error('Error configurando modal de pago:', error);
-        showNotification('Error cargando clientes para pago: ' + error.message, 'error');
     }
 }
 

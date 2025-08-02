@@ -328,8 +328,8 @@
                         <button id="btn-reporte-diario" class="btn-success" onclick="generarReporteDiario()">
                             📄 Generar Reporte PDF
                         </button>
-                        <button id="btn-monto-inicial" class="btn-secondary hidden" onclick="openModal('montoInicial')">
-                            💰 Monto Inicial
+                        <button id="btn-monto-inicial" class="btn-secondary" onclick="openModal('montoInicial')">
+                            <span class="btn-text">💰 Monto Inicial</span>
                         </button>
                         <button class="btn-danger" onclick="openModal('gasto')">
                             <span class="icon">➖</span>
@@ -399,6 +399,20 @@
                             <span class="method-total" id="transferencia-total">$0</span>
                         </div>
                         <p class="method-note" id="transferencia-note">Verificar extracto bancario</p>
+                    </div>
+
+                    <div class="payment-method creditos">
+                        <div class="method-header">
+                            <span class="method-label">💳 CRÉDITOS CREADOS HOY</span>
+                            <span class="method-total" id="creditos-creados-total">$0</span>
+                        </div>
+                        <div class="method-details" id="creditos-creados-details">
+                            <div class="detail-row">
+                                <span>Conduces emitidos:</span>
+                                <span id="detail-conduces-count">0 conduces</span>
+                            </div>
+                        </div>
+                        <p class="method-note" id="creditos-note">Estos montos representan ventas a crédito que aún no han sido cobradas</p>
                     </div>
 
                     <div class="payment-method total">
@@ -492,6 +506,15 @@
                 </select>
             </div>
             
+            <div class="form-group">
+                <label for="factura-metodo-pago">Método de Pago *</label>
+                <select id="factura-metodo-pago" required>
+                    <option value="efectivo">💵 Efectivo</option>
+                    <option value="tarjeta">💳 Tarjeta</option>
+                    <option value="transferencia">🏦 Transferencia</option>
+                </select>
+            </div>
+            
             <div id="rnc-options" class="form-group hidden">
                 <label>
                     <input type="checkbox" id="requiere-rnc"> 
@@ -523,6 +546,14 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="factura-comprobante-fiscal" onchange="calcularTotalesFactura()"> 
+                    Es comprobante fiscal (aplica ITBIS)
+                </label>
+                <small class="form-hint">Marcar solo si requiere aplicar ITBIS del 18%</small>
             </div>
 
             <div class="totales-section">
@@ -679,6 +710,14 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="conduce-comprobante-fiscal" onchange="calcularTotalConduce()"> 
+                    Es comprobante fiscal (aplica ITBIS)
+                </label>
+                <small class="form-hint">Marcar solo si requiere aplicar ITBIS del 18%</small>
+            </div>
+
             <div class="conduce-totals">
                 <div class="total-item">
                     <span>Subtotal:</span>
@@ -732,6 +771,15 @@
                         <input type="checkbox" id="generar-factura-rnc"> 
                         Generar factura con RNC
                     </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="metodo-pago-conduce">Método de Pago *</label>
+                    <select id="metodo-pago-conduce" required>
+                        <option value="transferencia" selected>Transferencia</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta">Tarjeta</option>
+                    </select>
                 </div>
             </div>
 

@@ -9,9 +9,15 @@ module.exports = {
       // Filtrar por fecha si se recibe ?fecha=YYYY-MM-DD
       if (req.query && req.query.fecha) {
         const fecha = req.query.fecha;
-        const start = new Date(fecha + 'T00:00:00.000Z');
-        const end = new Date(fecha + 'T23:59:59.999Z');
+        // Usar el mismo método que el reporte para consistencia con zona horaria
+        const startLocal = new Date(fecha + 'T00:00:00');
+        const endLocal = new Date(fecha + 'T23:59:59.999');
+        const start = new Date(startLocal.toISOString());
+        const end = new Date(endLocal.toISOString());
+        
+        console.log(`[VENTAS][DEBUG] Filtrando por fecha local: ${fecha}, rango UTC: ${start.toISOString()} a ${end.toISOString()}`);
         query.fecha = { $gte: start, $lte: end };
+        query.estado = { $ne: 'anulada' }; // Excluir ventas anuladas
       }
       const ventas = await Venta.find(query).populate('cliente', 'nombre telefono');
       console.log(`[VENTAS] Total encontradas: ${ventas.length}`);
@@ -90,20 +96,37 @@ module.exports = {
 
   async anular(req, res) {
     try {
-      console.log(`[VENTAS] Anulando venta: ${req.params.id}`);
+      const ventaId = req.params.id;
+      console.log(`[VENTAS] === ANULANDO VENTA ===`);
+      console.log(`[VENTAS] ID recibido: ${ventaId}`);
+      console.log(`[VENTAS] Método HTTP: ${req.method}`);
+      
+      // Validar que el ID sea válido
+      if (!ventaId || ventaId === 'undefined') {
+        console.error(`[VENTAS][ERROR] ID de venta inválido: ${ventaId}`);
+        return res.status(400).json({ error: 'ID de venta inválido' });
+      }
+
       const venta = await Venta.findByIdAndUpdate(
-        req.params.id,
+        ventaId,
         { estado: 'anulada' },
         { new: true }
       );
+      
       if (!venta) {
-        console.warn(`[VENTAS][WARN] Venta no encontrada para anular: ${req.params.id}`);
+        console.warn(`[VENTAS][WARN] Venta no encontrada para anular: ${ventaId}`);
         return res.status(404).json({ error: 'Venta no encontrada' });
       }
-      console.log('[VENTAS] Venta anulada:', venta._id);
+      
+      console.log(`[VENTAS] ✅ Venta anulada exitosamente: ${venta._id}`);
+      console.log(`[VENTAS] Estado anterior -> nuevo: activa -> ${venta.estado}`);
+      
       res.json(venta);
     } catch (error) {
-      console.error('[VENTAS][ERROR] al anular:', error, 'ID:', req.params.id);
+      console.error('[VENTAS][ERROR] al anular venta:');
+      console.error('[VENTAS][ERROR] ID:', req.params.id);
+      console.error('[VENTAS][ERROR] Error completo:', error);
+      console.error('[VENTAS][ERROR] Stack:', error.stack);
       res.status(500).json({ error: error.message });
     }
   }
