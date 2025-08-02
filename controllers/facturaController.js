@@ -63,6 +63,12 @@ module.exports = {
         query.rnc = { $exists: req.query.rnc === 'con' };
       }
       
+      // Filtrar por ID de orden de delivery
+      if (req.query.ordenDeliveryId) {
+        query.ordenDeliveryId = req.query.ordenDeliveryId;
+        console.log(`[FACTURAS][DEBUG] Filtrando por orden de delivery: ${req.query.ordenDeliveryId}`);
+      }
+      
       console.log(`[FACTURAS][DEBUG] Query final:`, query);
       
       const facturas = await Factura.find(query)
@@ -79,11 +85,50 @@ module.exports = {
   async create(req, res) {
     try {
       console.log('[FACTURAS] Creando factura:', req.body);
-      const { clienteId, productos, conducesIds, tipoComprobante, requiereRNC } = req.body;
-      const cliente = await Cliente.findById(clienteId);
-      if (!cliente) {
-        console.warn('[FACTURAS][WARN] Cliente no encontrado para factura:', clienteId);
-        return res.status(404).json({ error: 'Cliente no encontrado' });
+      const { 
+        clienteId, 
+        productos, 
+        conducesIds, 
+        tipoComprobante, 
+        requiereRNC,
+        ordenDeliveryId,
+        clienteNombre,
+        clienteTelefono,
+        clienteDireccion,
+        esComprobanteFiscal,
+        metodoPago,
+        fechaEmision
+      } = req.body;
+      
+      let cliente = null;
+      let clienteData = {};
+      
+      // Caso 1: Factura desde delivery (sin cliente registrado)
+      if (ordenDeliveryId && clienteNombre) {
+        console.log('[FACTURAS] Creando factura para delivery sin cliente registrado');
+        clienteData = {
+          nombre: clienteNombre,
+          telefono: clienteTelefono || '',
+          direccion: clienteDireccion || '',
+          rnc: ''
+        };
+      }
+      // Caso 2: Factura desde cliente registrado
+      else if (clienteId) {
+        cliente = await Cliente.findById(clienteId);
+        if (!cliente) {
+          console.warn('[FACTURAS][WARN] Cliente no encontrado para factura:', clienteId);
+          return res.status(404).json({ error: 'Cliente no encontrado' });
+        }
+        clienteData = {
+          nombre: cliente.nombre,
+          telefono: cliente.telefono,
+          direccion: cliente.direccion,
+          rnc: cliente.rnc || ''
+        };
+      }
+      else {
+        return res.status(400).json({ error: 'Debe proporcionar clienteId o datos de delivery' });
       }
       
       let subtotal = 0;
@@ -129,10 +174,12 @@ module.exports = {
           { estado: 'pagado', fechaPago: new Date() }
         );
         
-        // Actualizar saldo del cliente
-        const totalPagado = conduces.reduce((sum, conduce) => sum + conduce.total, 0);
-        cliente.saldoPendiente = Math.max(0, cliente.saldoPendiente - totalPagado);
-        await cliente.save();
+        // Actualizar saldo del cliente si existe
+        if (cliente) {
+          const totalPagado = conduces.reduce((sum, conduce) => sum + conduce.total, 0);
+          cliente.saldoPendiente = Math.max(0, cliente.saldoPendiente - totalPagado);
+          await cliente.save();
+        }
         
         console.log(`[FACTURAS] Agrupando ${conduces.length} conduces en factura. Total: ${totalPagado}`);
       }
@@ -140,22 +187,51 @@ module.exports = {
         return res.status(400).json({ error: 'Debe proporcionar productos o conduces para la factura' });
       }
       
-      const impuesto = subtotal * 0.18;
+      // Solo aplicar ITBIS si es comprobante fiscal
+      const impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
       const total = subtotal + impuesto;
       const count = await Factura.countDocuments();
       const numeroFactura = `FAC-${(count + 1).toString().padStart(6, '0')}`;
-      const factura = new Factura({
+      
+      // Construir datos de la factura
+      const facturaData = {
         numero: numeroFactura,
-        cliente: clienteId,
         productos: productosParaFactura,
         subtotal,
         impuesto,
         total,
-        tipoComprobante,
-        rnc: requiereRNC ? cliente.rnc : undefined
-      });
+        tipoComprobante: tipoComprobante || 'BOLETA',
+        esComprobanteFiscal: esComprobanteFiscal || false,
+        metodoPago: metodoPago || 'efectivo',
+        fechaEmision: fechaEmision ? new Date(fechaEmision) : new Date()
+      };
+      
+      // Si es factura de delivery, usar datos directos
+      if (ordenDeliveryId) {
+        facturaData.ordenDeliveryId = ordenDeliveryId;
+        facturaData.clienteNombre = clienteData.nombre;
+        facturaData.clienteTelefono = clienteData.telefono;
+        facturaData.clienteDireccion = clienteData.direccion;
+        facturaData.rnc = requiereRNC ? clienteData.rnc : undefined;
+        // No asignar cliente ID para delivery
+      } else {
+        // Factura normal con cliente registrado
+        facturaData.cliente = clienteId;
+        facturaData.rnc = requiereRNC ? clienteData.rnc : undefined;
+      }
+      
+      const factura = new Factura(facturaData);
       await factura.save();
-      await factura.populate('cliente', 'nombre telefono rnc direccion');
+      
+      // Solo popular cliente si existe
+      if (clienteId) {
+        await factura.populate('cliente', 'nombre telefono rnc direccion');
+      }
+      
+      // Para facturas de delivery, agregar datos de cliente manual para respuesta
+      if (ordenDeliveryId) {
+        factura.cliente = clienteData;
+      }
       
       // Emitir por WebSocket
       if (global.broadcast) {
@@ -224,14 +300,34 @@ module.exports = {
       if (factura.secuencia) {
         doc.text(`Secuencia: ${factura.secuencia}`, 400, 105);
       }
+      // Información del cliente
+      let clienteInfo;
+      if (factura.cliente && factura.cliente.nombre) {
+        // Cliente registrado
+        clienteInfo = {
+          nombre: factura.cliente.nombre,
+          telefono: factura.cliente.telefono || '',
+          direccion: factura.cliente.direccion || '',
+          rnc: factura.cliente.rnc || ''
+        };
+      } else {
+        // Factura de delivery con datos directos
+        clienteInfo = {
+          nombre: factura.clienteNombre || 'Cliente Delivery',
+          telefono: factura.clienteTelefono || '',
+          direccion: factura.clienteDireccion || '',
+          rnc: ''
+        };
+      }
+      
       doc.text('FACTURAR A:', 50, 160);
-      doc.text(`Cliente: ${factura.cliente.nombre}`, 50, 180);
-      doc.text(`Teléfono: ${factura.cliente.telefono}`, 50, 195);
+      doc.text(`Cliente: ${clienteInfo.nombre}`, 50, 180);
+      doc.text(`Teléfono: ${clienteInfo.telefono}`, 50, 195);
       if (factura.rnc) {
         doc.text(`RNC: ${factura.rnc}`, 50, 210);
       }
-      if (factura.cliente.direccion) {
-        doc.text(`Dirección: ${factura.cliente.direccion}`, 50, 225);
+      if (clienteInfo.direccion) {
+        doc.text(`Dirección: ${clienteInfo.direccion}`, 50, 225);
       }
       let yPosition = 260;
       doc.text('DESCRIPCIÓN', 50, yPosition);

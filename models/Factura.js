@@ -18,7 +18,18 @@ const facturaSchema = new mongoose.Schema({
   estado: { type: String, default: 'pagada' },
   fechaEmision: { type: Date, default: Date.now },
   rnc: String,
-  tipoComprobante: String
+  tipoComprobante: String,
+  
+  // Campos adicionales para facturas de delivery
+  ordenDeliveryId: { type: String }, // ID de la orden de delivery asociada
+  clienteNombre: { type: String }, // Nombre directo del cliente (fallback)
+  clienteTelefono: { type: String }, // Teléfono directo del cliente (fallback)
+  clienteDireccion: { type: String }, // Dirección directa del cliente (fallback)
+  
+  // Campos para comprobantes fiscales
+  esComprobanteFiscal: { type: Boolean, default: false },
+  requiereRNC: { type: Boolean, default: false },
+  metodoPago: { type: String, default: 'efectivo' }
 });
 
 module.exports = mongoose.model('Factura', facturaSchema);

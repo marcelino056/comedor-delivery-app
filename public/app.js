@@ -961,13 +961,18 @@ async function cambiarEstadoOrden(id, estado) {
     // Validar que la orden no esté ya entregada
     const orden = state.ordenes.find(o => o._id === id);
     if (orden && orden.estado === 'entregada') {
-        showNotification('No se puede cambiar el estado de una orden entregada', 'warning');
+        notify.warning('No se puede cambiar el estado de una orden entregada');
         return;
     }
 
     // Confirmar si se está marcando como entregada
     if (estado === 'entregada') {
-        if (!confirm('¿Confirmar entrega? Una vez entregada no se podrá cambiar el estado.')) {
+        const confirmed = await elegantConfirm(
+            '¿Confirmar entrega?\n\nUna vez marcada como entregada:\n• No se podrá cambiar el estado\n• Se habilitará la opción de facturación\n• El pedido quedará finalizado',
+            'Confirmar Entrega'
+        );
+        
+        if (!confirmed) {
             return;
         }
     }
@@ -989,11 +994,13 @@ async function cambiarEstadoOrden(id, estado) {
         await cargarDatosFecha();
         
         if (estado === 'entregada') {
-            showNotification('Orden marcada como entregada exitosamente', 'success');
+            notify.success('✅ Orden entregada exitosamente\n\nYa puede generar factura para este pedido');
+        } else {
+            notify.success(`Estado cambiado a: ${estado.replace('-', ' ').toUpperCase()}`);
         }
     } catch (error) {
         console.error('Error:', error);
-        showNotification(`Error al cambiar el estado: ${error.message}`, 'error');
+        notify.error(`Error al cambiar el estado: ${error.message}`);
     } finally {
         showLoading(false);
     }
@@ -1003,7 +1010,7 @@ async function cambiarMetodoPagoOrden(id, metodoPago) {
     // Validar que la orden no esté entregada
     const orden = state.ordenes.find(o => o._id === id);
     if (orden && orden.estado === 'entregada') {
-        showNotification('No se puede cambiar el método de pago de una orden entregada', 'warning');
+        notify.warning('No se puede cambiar el método de pago de una orden entregada');
         return;
     }
 
@@ -1022,13 +1029,316 @@ async function cambiarMetodoPagoOrden(id, metodoPago) {
         
         // Recargar datos después del cambio
         await cargarDatosFecha();
+        notify.success(`Método de pago cambiado a: ${metodoPago.toUpperCase()}`);
     } catch (error) {
         console.error('Error:', error);
-        showNotification(`Error al cambiar el método de pago: ${error.message}`, 'error');
+        notify.error(`Error al cambiar el método de pago: ${error.message}`);
     } finally {
         showLoading(false);
     }
 }
+
+// ============== FUNCIÓN DE FACTURACIÓN POST-DELIVERY ==============
+
+async function solicitarFacturaDelivery(ordenId) {
+    console.log('🧾 FACTURA DELIVERY: Iniciando proceso para orden:', ordenId);
+    
+    try {
+        // Validaciones básicas
+        const orden = state.ordenes.find(o => o._id === ordenId);
+        if (!orden) {
+            notify.error('Orden no encontrada');
+            return;
+        }
+        
+        console.log('🧾 FACTURA DELIVERY: Orden encontrada:', orden);
+        
+        // Verificar que esté entregada
+        if (orden.estado !== 'entregada') {
+            notify.warning('La orden debe estar entregada para generar factura');
+            return;
+        }
+        
+        // Verificar que no tenga factura ya
+        if (orden.facturaId) {
+            notify.info(`Esta orden ya tiene factura: #${orden.numeroFactura || orden.facturaId}`);
+            return;
+        }
+        
+        // Confirmar acción
+        const numeroOrden = orden.numero || orden._id.slice(-6).toUpperCase(); // Usar últimos 6 caracteres del ID como fallback
+        const confirmed = await elegantConfirm(
+            `¿Generar factura para la orden de delivery #${numeroOrden}?\n\nCliente: ${orden.cliente}\nTotal: $${orden.total.toFixed(2)}`,
+            'Confirmar Facturación'
+        );
+        
+        if (!confirmed) return;
+        
+        // Preguntar si requiere ITBIS (comprobante fiscal) con modal personalizado
+        const requiereITBIS = await confirmarTipoComprobante(orden.total);
+        
+        const tipoComprobante = requiereITBIS ? 'FACTURA' : 'BOLETA';
+        const totalConImpuesto = requiereITBIS ? orden.total * 1.18 : orden.total;
+        
+        console.log('🧾 FACTURA DELIVERY: Usuario confirmó, procediendo...');
+        console.log('🧾 FACTURA DELIVERY: Tipo:', tipoComprobante, 'ITBIS:', requiereITBIS);
+        
+        showLoading(true);
+        notify.info(`Generando ${tipoComprobante.toLowerCase()}...`);
+        
+        // Datos para la factura
+        const facturaData = {
+            ordenDeliveryId: ordenId,
+            clienteNombre: orden.cliente,
+            clienteTelefono: orden.telefono || '',
+            clienteDireccion: orden.direccion || '',
+            productos: [{
+                descripcion: `Delivery #${numeroOrden} - ${orden.descripcion || orden.items || 'Pedido delivery'}`,
+                cantidad: 1,
+                precioUnitario: orden.total,
+                total: orden.total
+            }],
+            tipoComprobante: tipoComprobante,
+            requiereRNC: requiereITBIS, // Solo si requiere ITBIS
+            esComprobanteFiscal: requiereITBIS, // Aplicar ITBIS según elección
+            metodoPago: orden.metodoPago || 'efectivo',
+            fechaEmision: state.fechaSeleccionada
+        };
+        
+        console.log('🧾 FACTURA DELIVERY: Datos de factura preparados:', facturaData);
+        
+        // Crear factura
+        const facturaResponse = await fetch(`${API_BASE}/facturas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(facturaData)
+        });
+        
+        if (!facturaResponse.ok) {
+            const errorData = await facturaResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || `Error ${facturaResponse.status}: No se pudo crear la factura`);
+        }
+        
+        const factura = await facturaResponse.json();
+        console.log('🧾 FACTURA DELIVERY: Factura creada:', factura);
+        
+        // Actualizar la orden con la información de la factura
+        const updateResponse = await fetch(`${API_BASE}/ordenes/${ordenId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                facturaId: factura._id,
+                numeroFactura: factura.numero 
+            })
+        });
+        
+        if (!updateResponse.ok) {
+            console.warn('🧾 FACTURA DELIVERY: Error actualizando orden, pero factura creada');
+        } else {
+            console.log('🧾 FACTURA DELIVERY: Orden actualizada exitosamente');
+        }
+        
+        // Actualizar estado local inmediatamente
+        orden.facturaId = factura._id;
+        orden.numeroFactura = factura.numero;
+        
+        // Re-renderizar las órdenes para mostrar el cambio
+        renderOrdenes();
+        
+        // Recargar datos para sincronizar
+        await cargarDatosFecha();
+        
+        const tipoTexto = tipoComprobante === 'FACTURA' ? 'Factura' : 'Boleta';
+        const impuestoTexto = requiereITBIS ? ' (con ITBIS)' : ' (sin ITBIS)';
+        notify.success(`✅ ${tipoTexto} #${factura.numero} generada exitosamente${impuestoTexto}`);
+        
+        // Preguntar si quiere descargar
+        const download = await elegantConfirm(
+            `¿Desea descargar la ${tipoTexto.toLowerCase()} en PDF?`,
+            `Descargar ${tipoTexto}`
+        );
+        
+        if (download) {
+            descargarFacturaPDF(factura._id);
+        }
+        
+    } catch (error) {
+        console.error('🧾 FACTURA DELIVERY ERROR:', error);
+        notify.error(`Error al generar factura: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Exponer función globalmente
+window.solicitarFacturaDelivery = solicitarFacturaDelivery;
+
+// Alias para renderOrdenes
+window.renderOrdenes = updateOrdenesView;
+
+// Función auxiliar para imprimir factura
+window.imprimirFactura = function(facturaId) {
+    const url = `${API_BASE}/facturas/${facturaId}/pdf`;
+    const ventanaImpresion = window.open(url, '_blank');
+    
+    // Intentar imprimir automáticamente
+    ventanaImpresion.onload = function() {
+        setTimeout(() => {
+            ventanaImpresion.print();
+        }, 500);
+    };
+};
+
+// Función para confirmar tipo de comprobante (con o sin ITBIS)
+window.confirmarTipoComprobante = function(subtotal) {
+    return new Promise((resolve) => {
+        const totalConITBIS = subtotal * 1.18;
+        
+        // Crear overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'elegant-confirm-overlay';
+        
+        // Crear modal personalizado
+        const modal = document.createElement('div');
+        modal.className = 'elegant-confirm-modal comprobante-modal';
+        
+        modal.innerHTML = `
+            <div class="elegant-confirm-content">
+                <h3 class="elegant-confirm-title">¿Tipo de Comprobante?</h3>
+                <p class="elegant-confirm-message">Seleccione el tipo de comprobante a generar:</p>
+                
+                <div class="comprobante-options">
+                    <div class="comprobante-option" data-tipo="boleta">
+                        <div class="option-header">
+                            <span class="option-icon">🧾</span>
+                            <span class="option-title">BOLETA</span>
+                        </div>
+                        <div class="option-details">
+                            <div class="option-price">$${subtotal.toFixed(2)}</div>
+                            <div class="option-description">Sin ITBIS • Uso personal</div>
+                        </div>
+                    </div>
+                    
+                    <div class="comprobante-option" data-tipo="factura">
+                        <div class="option-header">
+                            <span class="option-icon">📄</span>
+                            <span class="option-title">FACTURA</span>
+                        </div>
+                        <div class="option-details">
+                            <div class="option-price">$${totalConITBIS.toFixed(2)}</div>
+                            <div class="option-description">Con ITBIS (18%) • Comprobante fiscal</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="elegant-confirm-buttons">
+                    <button class="elegant-btn elegant-btn-cancel" onclick="handleComprobanteResponse(null)">Cancelar</button>
+                </div>
+            </div>
+        `;
+        
+        // Agregar estilos específicos para este modal
+        if (!document.getElementById('comprobante-modal-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'comprobante-modal-styles';
+            styles.textContent = `
+                .comprobante-modal {
+                    max-width: 480px;
+                }
+                
+                .comprobante-options {
+                    display: flex;
+                    gap: 16px;
+                    margin: 20px 0;
+                }
+                
+                .comprobante-option {
+                    flex: 1;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 12px;
+                    padding: 16px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    background: #f9fafb;
+                }
+                
+                .comprobante-option:hover {
+                    border-color: #3b82f6;
+                    background: #eff6ff;
+                    transform: translateY(-2px);
+                }
+                
+                .option-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                }
+                
+                .option-icon {
+                    font-size: 24px;
+                }
+                
+                .option-title {
+                    font-weight: 600;
+                    color: #1f2937;
+                    font-size: 14px;
+                }
+                
+                .option-price {
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: #059669;
+                    margin-bottom: 4px;
+                }
+                
+                .option-description {
+                    font-size: 12px;
+                    color: #6b7280;
+                    line-height: 1.3;
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Agregar event listeners a las opciones
+        modal.querySelectorAll('.comprobante-option').forEach(option => {
+            option.addEventListener('click', () => {
+                const tipo = option.getAttribute('data-tipo');
+                const requiereITBIS = tipo === 'factura';
+                window.handleComprobanteResponse(requiereITBIS);
+            });
+        });
+        
+        // Función global para manejar respuesta
+        window.handleComprobanteResponse = function(requiereITBIS) {
+            overlay.remove();
+            delete window.handleComprobanteResponse;
+            resolve(requiereITBIS);
+        };
+        
+        // Cerrar con ESC
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEsc);
+                window.handleComprobanteResponse(null);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+        
+        // Cerrar al hacer clic fuera del modal
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                window.handleComprobanteResponse(null);
+            }
+        });
+    });
+};
+
+// ============== FIN FUNCIÓN DE FACTURACIÓN ==============
 
 // Actualización de vistas
 function updateAllViews() {
@@ -1237,6 +1547,23 @@ function updateOrdenesView() {
                             <small style="display: block; color: #6b7280; font-size: 0.625rem; margin-top: 0.25rem;">
                                 Estado final - No se puede modificar
                             </small>
+                            <div style="margin-top: 0.5rem;">
+                                ${orden.facturaId ? `
+                                    <div class="factura-info" style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 0.5rem; padding: 0.5rem 0.75rem; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                        <span style="color: #0369a1; font-weight: 600; font-size: 0.75rem;">📄 Factura #${orden.numeroFactura || orden.facturaId}</span>
+                                        <button onclick="descargarFacturaPDF('${orden.facturaId}')" style="background: none; border: none; color: #0369a1; cursor: pointer; padding: 0.25rem; border-radius: 0.25rem; font-size: 0.75rem;" title="Descargar factura">
+                                            📥
+                                        </button>
+                                        <button onclick="imprimirFactura('${orden.facturaId}')" style="background: none; border: none; color: #0369a1; cursor: pointer; padding: 0.25rem; border-radius: 0.25rem; font-size: 0.75rem;" title="Imprimir factura">
+                                            🖨️
+                                        </button>
+                                    </div>
+                                ` : `
+                                    <button class="btn-factura-delivery" onclick="solicitarFacturaDelivery('${orden._id}')" title="Generar factura para esta orden">
+                                        🧾 Solicitar Factura
+                                    </button>
+                                `}
+                            </div>
                         </div>
                     ` : !orden.anulada ? `
                         <div class="state-display">
@@ -2194,6 +2521,11 @@ async function cargarFacturas() {
 
         const response = await fetch(`${API_BASE}/facturas?${filtros}`);
         state.facturas = await response.json();
+        
+        console.log('🔍 DEBUG FACTURAS: URL consultada:', `${API_BASE}/facturas?${filtros}`);
+        console.log('🔍 DEBUG FACTURAS: Facturas obtenidas:', state.facturas?.length || 0);
+        console.log('🔍 DEBUG FACTURAS: Primera factura:', state.facturas?.[0]);
+        
         updateFacturasView();
     } catch (error) {
         console.error('Error cargando facturas:', error);
@@ -2201,14 +2533,22 @@ async function cargarFacturas() {
 }
 
 function updateFacturasView() {
+    console.log('🔍 DEBUG FACTURAS VIEW: Iniciando actualización de vista');
+    console.log('🔍 DEBUG FACTURAS VIEW: state.facturas.length =', state.facturas?.length || 0);
+    
     const list = document.getElementById('facturas-list');
-    if (!list) return;
+    if (!list) {
+        console.log('❌ DEBUG FACTURAS VIEW: No se encontró el elemento facturas-list');
+        return;
+    }
 
     if (state.facturas.length === 0) {
+        console.log('🔍 DEBUG FACTURAS VIEW: No hay facturas, mostrando mensaje');
         list.innerHTML = '<p class="no-data">No hay facturas para los filtros seleccionados</p>';
         return;
     }
 
+    console.log('🔍 DEBUG FACTURAS VIEW: Renderizando', state.facturas.length, 'facturas');
     list.innerHTML = state.facturas.map(factura => `
         <div class="factura-card ${factura.anulada ? 'anulada' : ''}">
             <div class="factura-header">
@@ -3616,3 +3956,307 @@ function showNotification(message, type = 'info') {
         }
     }, 5000);
 }
+
+// ================== FUNCIONES DE DEBUG ==================
+
+// Función para probar la carga de facturas manualmente
+window.debugCargarFacturas = async function() {
+    console.log('🧪 DEBUG: Probando carga manual de facturas');
+    console.log('🧪 DEBUG: Fecha seleccionada actual:', state.fechaSeleccionada);
+    await cargarFacturas();
+};
+
+// Función para verificar el estado
+window.debugEstado = function() {
+    console.log('🔍 Estado general:', {
+        fechaSeleccionada: state.fechaSeleccionada,
+        facturas: state.facturas?.length || 0,
+        ordenes: state.ordenes?.length || 0
+    });
+};
+
+// ================== FIN FUNCIONES DE DEBUG ==================
+
+// ============== SISTEMA DE NOTIFICACIONES ELEGANTES ==============
+
+// Función de notificación moderna que reemplaza alerts
+window.notify = {
+    success: function(message) {
+        showElegantNotification(message, 'success');
+    },
+    error: function(message) {
+        showElegantNotification(message, 'error');
+    },
+    warning: function(message) {
+        showElegantNotification(message, 'warning');
+    },
+    info: function(message) {
+        showElegantNotification(message, 'info');
+    }
+};
+
+function showElegantNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `elegant-notification ${type}`;
+    
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${icons[type]}</span>
+            <span class="notification-message">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    `;
+    
+    // Agregar estilos si no existen
+    if (!document.getElementById('elegant-notification-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'elegant-notification-styles';
+        styles.textContent = `
+            .elegant-notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                min-width: 300px;
+                max-width: 450px;
+                padding: 0;
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+                z-index: 10000;
+                animation: slideInNotification 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.2);
+            }
+            
+            .elegant-notification.success {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+            }
+            
+            .elegant-notification.error {
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                color: white;
+            }
+            
+            .elegant-notification.warning {
+                background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                color: white;
+            }
+            
+            .elegant-notification.info {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                color: white;
+            }
+            
+            .notification-content {
+                display: flex;
+                align-items: center;
+                padding: 16px 20px;
+                gap: 12px;
+            }
+            
+            .notification-icon {
+                font-size: 20px;
+                flex-shrink: 0;
+            }
+            
+            .notification-message {
+                flex: 1;
+                font-size: 14px;
+                font-weight: 500;
+                line-height: 1.4;
+            }
+            
+            .notification-close {
+                background: none;
+                border: none;
+                color: inherit;
+                cursor: pointer;
+                font-size: 20px;
+                padding: 4px;
+                border-radius: 6px;
+                transition: background-color 0.2s;
+                flex-shrink: 0;
+            }
+            
+            .notification-close:hover {
+                background-color: rgba(255,255,255,0.2);
+            }
+            
+            @keyframes slideInNotification {
+                from {
+                    transform: translateX(100%) scale(0.8);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0) scale(1);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remover después de 5 segundos
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.animation = 'slideInNotification 0.3s reverse';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }, 5000);
+}
+
+// Función de confirmación elegante que reemplaza confirm()
+window.elegantConfirm = function(message, title = 'Confirmación') {
+    return new Promise((resolve) => {
+        // Crear overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'elegant-confirm-overlay';
+        
+        // Crear modal
+        const modal = document.createElement('div');
+        modal.className = 'elegant-confirm-modal';
+        
+        modal.innerHTML = `
+            <div class="elegant-confirm-content">
+                <h3 class="elegant-confirm-title">${title}</h3>
+                <p class="elegant-confirm-message">${message}</p>
+                <div class="elegant-confirm-buttons">
+                    <button class="elegant-btn elegant-btn-cancel" onclick="handleConfirmResponse(false)">Cancelar</button>
+                    <button class="elegant-btn elegant-btn-confirm" onclick="handleConfirmResponse(true)">Confirmar</button>
+                </div>
+            </div>
+        `;
+        
+        // Agregar estilos si no existen
+        if (!document.getElementById('elegant-confirm-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'elegant-confirm-styles';
+            styles.textContent = `
+                .elegant-confirm-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: rgba(0,0,0,0.6);
+                    z-index: 10001;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    animation: fadeInOverlay 0.3s ease-out;
+                    backdrop-filter: blur(4px);
+                }
+                
+                .elegant-confirm-modal {
+                    background: white;
+                    border-radius: 16px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                    max-width: 400px;
+                    width: 90%;
+                    animation: scaleInModal 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                
+                .elegant-confirm-content {
+                    padding: 24px;
+                }
+                
+                .elegant-confirm-title {
+                    margin: 0 0 12px 0;
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #1f2937;
+                }
+                
+                .elegant-confirm-message {
+                    margin: 0 0 24px 0;
+                    color: #6b7280;
+                    line-height: 1.5;
+                }
+                
+                .elegant-confirm-buttons {
+                    display: flex;
+                    gap: 12px;
+                    justify-content: flex-end;
+                }
+                
+                .elegant-btn {
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-size: 14px;
+                }
+                
+                .elegant-btn-cancel {
+                    background-color: #f3f4f6;
+                    color: #6b7280;
+                }
+                
+                .elegant-btn-cancel:hover {
+                    background-color: #e5e7eb;
+                }
+                
+                .elegant-btn-confirm {
+                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    color: white;
+                }
+                
+                .elegant-btn-confirm:hover {
+                    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+                    transform: translateY(-1px);
+                }
+                
+                @keyframes fadeInOverlay {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                
+                @keyframes scaleInModal {
+                    from { transform: scale(0.8); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Función global para manejar respuesta
+        window.handleConfirmResponse = function(confirmed) {
+            overlay.remove();
+            delete window.handleConfirmResponse;
+            resolve(confirmed);
+        };
+        
+        // Cerrar con ESC
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEsc);
+                window.handleConfirmResponse(false);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+        
+        // Cerrar al hacer clic fuera del modal
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                window.handleConfirmResponse(false);
+            }
+        });
+    });
+};
+
+// ============== FIN SISTEMA DE NOTIFICACIONES ==============
