@@ -891,6 +891,11 @@ async function submitMontoInicial() {
 
 // Acciones sobre items
 async function anularVenta(id) {
+    console.log("[DEBUG] anularVenta llamada con ID:", id, typeof id);
+    if (!id || id === "undefined") {
+        notify.error("ID de venta inválido");
+        return;
+    }
     const confirmed = await elegantConfirm(
         '¿Estás seguro de anular esta venta?',
         'Anular Venta'
@@ -921,11 +926,11 @@ async function anularVenta(id) {
         // Recargar datos para reflejar los cambios
         await cargarDatosFecha(state.fechaSeleccionada);
         
-        showNotification('Venta anulada exitosamente', 'success');
+        notify.success('Venta anulada exitosamente');
         
     } catch (error) {
         console.error('[FRONTEND] Error al anular venta:', error);
-        showNotification(`Error al anular la venta: ${error.message}`, 'error');
+        notify.error(`Error al anular la venta: ${error.message}`);
     } finally {
         showLoading(false);
     }
