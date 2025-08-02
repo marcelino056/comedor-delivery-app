@@ -632,6 +632,7 @@ function getOrdenModalContent() {
                 <option value="efectivo">Efectivo</option>
                 <option value="tarjeta">Tarjeta</option>
                 <option value="transferencia">Transferencia</option>
+                <option value="credito">Crédito</option>
             </select>
         </div>
         <div class="form-group">
@@ -1002,7 +1003,20 @@ async function cambiarEstadoOrden(id, estado) {
         await cargarDatosFecha();
         
         if (estado === 'entregada') {
-            notify.success('✅ Orden entregada exitosamente\n\nYa puede generar factura para este pedido');
+            // Verificar si el método de pago es crédito para generar conduce automáticamente
+            const orden = state.ordenes.find(o => o._id === id);
+            if (orden && orden.metodoPago === 'credito') {
+                try {
+                    console.log('💳 ENTREGA A CRÉDITO: Generando conduce automático...');
+                    await generarConduceDelivery(orden);
+                    notify.success('✅ Orden entregada exitosamente\n📋 Conduce generado automáticamente por pago a crédito');
+                } catch (error) {
+                    console.error('💳 ERROR CONDUCE AUTOMÁTICO:', error);
+                    notify.warning(`✅ Orden entregada, pero error al generar conduce: ${error.message}`);
+                }
+            } else {
+                notify.success('✅ Orden entregada exitosamente\n\nYa puede generar factura para este pedido');
+            }
         } else {
             notify.success(`Estado cambiado a: ${estado.replace('-', ' ').toUpperCase()}`);
         }
@@ -1180,6 +1194,126 @@ async function solicitarFacturaDelivery(ordenId) {
 
 // Exponer función globalmente
 window.solicitarFacturaDelivery = solicitarFacturaDelivery;
+
+// ============== FUNCIÓN PARA BUSCAR O CREAR CLIENTE ==============
+
+async function buscarOCrearCliente(nombre, telefono, direccion) {
+    try {
+        console.log('👤 CLIENTE: Buscando cliente por teléfono:', telefono);
+        
+        // Buscar cliente existente por teléfono
+        const response = await fetch(`${API_BASE}/clientes`);
+        if (!response.ok) {
+            throw new Error('Error al obtener clientes');
+        }
+        
+        const clientes = await response.json();
+        let cliente = clientes.find(c => c.telefono === telefono);
+        
+        if (cliente) {
+            console.log('👤 CLIENTE: Cliente encontrado:', cliente);
+            return cliente;
+        }
+        
+        // Si no existe, crear nuevo cliente
+        console.log('👤 CLIENTE: Creando nuevo cliente...');
+        const nuevoCliente = {
+            nombre: nombre,
+            telefono: telefono,
+            direccion: direccion || '',
+            rnc: '', // Vacío inicialmente
+            creditoHabilitado: true, // Habilitar crédito por defecto para delivery
+            limiteCredito: 50000, // Límite por defecto de $50,000
+            diasCredito: 30, // 30 días por defecto
+            saldoPendiente: 0
+        };
+        
+        const createResponse = await fetch(`${API_BASE}/clientes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(nuevoCliente)
+        });
+        
+        if (!createResponse.ok) {
+            const errorData = await createResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Error al crear cliente');
+        }
+        
+        cliente = await createResponse.json();
+        console.log('👤 CLIENTE: Cliente creado exitosamente:', cliente);
+        notify.success(`Cliente "${nombre}" creado automáticamente para crédito`);
+        
+        return cliente;
+        
+    } catch (error) {
+        console.error('👤 CLIENTE ERROR:', error);
+        throw error;
+    }
+}
+
+// ============== FUNCIÓN PARA GENERAR CONDUCE AUTOMÁTICO ==============
+
+async function generarConduceDelivery(orden) {
+    try {
+        console.log('📋 CONDUCE DELIVERY: Generando conduce para orden:', orden);
+        
+        // Buscar o crear cliente
+        const cliente = await buscarOCrearCliente(orden.cliente, orden.telefono, orden.direccion);
+        
+        // Preparar productos para el conduce
+        const productos = [
+            {
+                descripcion: orden.descripcion || 'Pedido delivery',
+                cantidad: 1,
+                precioUnitario: orden.monto || (orden.total - orden.costoDelivery),
+                total: orden.monto || (orden.total - orden.costoDelivery)
+            }
+        ];
+        
+        // Agregar delivery como producto adicional si tiene costo
+        if (orden.costoDelivery && orden.costoDelivery > 0) {
+            productos.push({
+                descripcion: 'Delivery',
+                cantidad: 1,
+                precioUnitario: orden.costoDelivery,
+                total: orden.costoDelivery
+            });
+        }
+        
+        // Datos del conduce
+        const conduceData = {
+            clienteId: cliente._id,
+            productos: productos,
+            esComprobanteFiscal: false, // Sin impuestos inicialmente (se aplicarán después si es necesario)
+            diasVencimiento: cliente.diasCredito || 30
+        };
+        
+        console.log('📋 CONDUCE DELIVERY: Datos del conduce:', conduceData);
+        
+        // Crear conduce
+        const response = await fetch(`${API_BASE}/conduces`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(conduceData)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Error al crear conduce');
+        }
+        
+        const conduce = await response.json();
+        console.log('📋 CONDUCE DELIVERY: Conduce creado exitosamente:', conduce);
+        
+        notify.success(`Conduce #${conduce.numero} generado automáticamente para "${cliente.nombre}"`);
+        
+        return conduce;
+        
+    } catch (error) {
+        console.error('📋 CONDUCE DELIVERY ERROR:', error);
+        throw error;
+    }
+}
 
 // Alias para renderOrdenes
 window.renderOrdenes = updateOrdenesView;
@@ -1505,6 +1639,10 @@ function updateOrdenesView() {
                             <button class="payment-btn transferencia ${orden.metodoPago === 'transferencia' ? 'active' : ''}"
                                     onclick="cambiarMetodoPagoOrden('${orden._id}', 'transferencia')">
                                 🏦 Transfer
+                            </button>
+                            <button class="payment-btn credito ${orden.metodoPago === 'credito' ? 'active' : ''}"
+                                    onclick="cambiarMetodoPagoOrden('${orden._id}', 'credito')">
+                                📋 Crédito
                             </button>
                         </div>
                     ` : !orden.anulada ? `

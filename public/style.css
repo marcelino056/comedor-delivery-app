@@ -927,6 +927,11 @@ body {
     color: white;
 }
 
+.payment-btn.active.credito {
+    background: #dc2626;
+    color: white;
+}
+
 .state-buttons {
     display: grid;
     grid-template-columns: 1fr 1fr;
