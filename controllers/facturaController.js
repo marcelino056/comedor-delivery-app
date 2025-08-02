@@ -168,6 +168,9 @@ module.exports = {
           });
         });
         
+        // Calcular total pagado de los conduces
+        const totalPagado = conduces.reduce((sum, conduce) => sum + conduce.total, 0);
+        
         // Marcar conduces como pagados
         await Conduce.updateMany(
           { _id: { $in: conducesIds } },
@@ -176,7 +179,6 @@ module.exports = {
         
         // Actualizar saldo del cliente si existe
         if (cliente) {
-          const totalPagado = conduces.reduce((sum, conduce) => sum + conduce.total, 0);
           cliente.saldoPendiente = Math.max(0, cliente.saldoPendiente - totalPagado);
           await cliente.save();
         }

@@ -890,7 +890,11 @@ async function submitMontoInicial() {
 
 // Acciones sobre items
 async function anularVenta(id) {
-    if (!confirm('¿Estás seguro de anular esta venta?')) return;
+    const confirmed = await elegantConfirm(
+        '¿Estás seguro de anular esta venta?',
+        'Anular Venta'
+    );
+    if (!confirmed) return;
 
     console.log('[FRONTEND] Anulando venta:', id);
     showLoading(true);
@@ -934,7 +938,11 @@ async function anularOrden(id) {
         return;
     }
 
-    if (!confirm('¿Estás seguro de anular esta orden?')) return;
+    const confirmed = await elegantConfirm(
+        '¿Estás seguro de anular esta orden?',
+        'Anular Orden'
+    );
+    if (!confirmed) return;
 
     showLoading(true);
     try {
@@ -2278,7 +2286,7 @@ async function generarReporteDiario() {
     } catch (error) {
         showLoading(false);
         console.error('Error generando reporte:', error);
-        alert(`❌ Error al generar el reporte: ${error.message}`);
+        notify.error('Error al generar el reporte: ' + error.message);
     }
 }
 
@@ -2441,7 +2449,7 @@ async function guardarCliente(event) {
     } catch (error) {
         showLoading(false);
         console.error('Error guardando cliente:', error);
-        alert('❌ Error al guardar cliente');
+        notify.error('No se pudo guardar el cliente. Verifica los datos e inténtalo nuevamente.');
     }
 }
 
@@ -2464,7 +2472,11 @@ async function editarCliente(id) {
 }
 
 async function desactivarCliente(id) {
-    if (!confirm('¿Estás seguro de desactivar este cliente?')) return;
+    const confirmed = await elegantConfirm(
+        '¿Estás seguro de desactivar este cliente?',
+        'Desactivar Cliente'
+    );
+    if (!confirmed) return;
 
     try {
         showLoading(true);
@@ -2483,7 +2495,7 @@ async function desactivarCliente(id) {
     } catch (error) {
         showLoading(false);
         console.error('Error desactivando cliente:', error);
-        alert('❌ Error al desactivar cliente');
+        notify.error('No se pudo desactivar el cliente. Inténtalo nuevamente.');
     }
 }
 
@@ -2549,19 +2561,25 @@ function updateFacturasView() {
     }
 
     console.log('🔍 DEBUG FACTURAS VIEW: Renderizando', state.facturas.length, 'facturas');
-    list.innerHTML = state.facturas.map(factura => `
+    list.innerHTML = state.facturas.map(factura => {
+        // Manejar tanto facturas con cliente registrado como facturas de delivery
+        const clienteNombre = factura.cliente?.nombre || factura.clienteNombre || 'Cliente Delivery';
+        
+        return `
         <div class="factura-card ${factura.anulada ? 'anulada' : ''}">
             <div class="factura-header">
                 <div>
                     <div class="factura-numero">${factura.numero}</div>
                     <span class="factura-tipo ${factura.tipoComprobante}">${factura.tipoComprobante}</span>
                     ${factura.anulada ? '<span class="factura-anulada">ANULADA</span>' : ''}
+                    ${factura.esComprobanteFiscal ? '<span class="factura-fiscal">FISCAL</span>' : ''}
                 </div>
                 <div class="factura-total">$${factura.total.toFixed(2)}</div>
             </div>
-            <div class="factura-cliente">${factura.cliente.nombre}</div>
+            <div class="factura-cliente">${clienteNombre}</div>
             <div class="factura-fecha">${new Date(factura.fechaEmision).toLocaleDateString('es-DO')}</div>
             ${factura.rnc ? `<div class="factura-rnc">RNC: ${factura.rnc}</div>` : ''}
+            ${factura.ordenDeliveryId ? `<div class="factura-delivery">📦 Delivery</div>` : ''}
             ${!factura.anulada ? `
                 <div class="factura-actions">
                     <button class="btn-primary btn-sm" onclick="descargarFacturaPDF('${factura._id}')">
@@ -2572,8 +2590,8 @@ function updateFacturasView() {
                     </button>
                 </div>
             ` : ''}
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 async function generarFactura(event) {
@@ -2607,7 +2625,7 @@ async function generarFactura(event) {
         });
 
         if (productos.length === 0) {
-            alert('Debe agregar al menos un producto');
+            notify.warning('Debe agregar al menos un producto a la factura.');
             showLoading(false);
             return;
         }
@@ -2652,7 +2670,7 @@ async function generarFactura(event) {
     } catch (error) {
         showLoading(false);
         console.error('Error generando factura:', error);
-        alert('❌ ' + error.message);
+        notify.error('Error al generar la factura: ' + error.message);
     }
 }
 
@@ -2678,12 +2696,16 @@ async function descargarFacturaPDF(facturaId) {
     } catch (error) {
         showLoading(false);
         console.error('Error descargando PDF:', error);
-        alert('❌ Error al descargar PDF');
+        notify.error('No se pudo descargar el PDF de la factura. Inténtalo nuevamente.');
     }
 }
 
 async function anularFactura(facturaId) {
-    const motivo = prompt('Ingrese el motivo de anulación:');
+    const motivo = await elegantPrompt(
+        'Ingrese el motivo de anulación de la factura:',
+        'Anular Factura',
+        'Ej: Error en productos, cliente canceló, etc.'
+    );
     if (!motivo) return;
 
     try {
@@ -2711,7 +2733,7 @@ async function anularFactura(facturaId) {
     } catch (error) {
         showLoading(false);
         console.error('Error anulando factura:', error);
-        alert('❌ Error al anular factura');
+        notify.error('No se pudo anular la factura. Verifica tu conexión e inténtalo nuevamente.');
     }
 }
 
@@ -2921,7 +2943,7 @@ async function guardarConfiguracionRNC(event) {
     } catch (error) {
         showLoading(false);
         console.error('Error guardando configuración RNC:', error);
-        alert('❌ Error al guardar configuración RNC');
+        notify.error('No se pudo guardar la configuración RNC. Inténtalo nuevamente.');
     }
 }
 
@@ -2962,7 +2984,7 @@ async function descargarReporteRNC(event) {
     } catch (error) {
         showLoading(false);
         console.error('Error descargando reporte RNC:', error);
-        alert('❌ Error al descargar reporte RNC');
+        notify.error('No se pudo generar el reporte RNC. Verifica los datos e inténtalo nuevamente.');
     }
 }
 
@@ -3344,9 +3366,16 @@ async function pagarCreditos(event) {
         // No recargar facturas aquí ya que el WebSocket ya debería haberlo hecho
         // await cargarFacturas();
         console.log('[PAGO-CREDITOS] Datos recargados exitosamente');
+        
         // Preguntar si quiere descargar la factura
-        if (factura && factura._id && confirm('¿Desea descargar la factura en PDF?')) {
-            descargarFacturaPDF(factura._id);
+        if (factura && factura._id) {
+            const download = await elegantConfirm(
+                '¿Desea descargar la factura en PDF?',
+                'Descargar Factura'
+            );
+            if (download) {
+                descargarFacturaPDF(factura._id);
+            }
         }
     } catch (error) {
         console.error('Error procesando pago:', error);
@@ -3515,7 +3544,7 @@ async function filtrarCreditos() {
         
     } catch (error) {
         console.error('[CREDITOS][ERROR] al filtrar:', error);
-        alert('Error al filtrar créditos');
+        notify.error('Error al filtrar los créditos. Inténtalo nuevamente.');
     }
 }
 
@@ -3526,7 +3555,11 @@ function verConducePDF(conduceId) {
 
 // Anular conduce
 async function anularConduce(conduceId) {
-    const motivo = prompt('Motivo de anulación:');
+    const motivo = await elegantPrompt(
+        'Motivo de anulación del conduce:',
+        'Anular Conduce',
+        'Ej: Error en pedido, cliente canceló, etc.'
+    );
     if (!motivo) return;
     
     try {
@@ -3801,7 +3834,7 @@ function manejarCambioLogo(event) {
     const file = event.target.files[0];
     if (file) {
         if (file.size > 2 * 1024 * 1024) { // 2MB límite
-            alert('El archivo es muy grande. Máximo 2MB.');
+            notify.warning('El archivo es muy grande. El tamaño máximo permitido es 2MB.');
             event.target.value = '';
             return;
         }
@@ -3976,6 +4009,28 @@ window.debugEstado = function() {
 };
 
 // ================== FIN FUNCIONES DE DEBUG ==================
+
+// Función para probar la carga de facturas manualmente
+window.debugCargarFacturas = async function() {
+    console.log('🧪 DEBUG: Probando carga manual de facturas');
+    console.log('🧪 DEBUG: Fecha seleccionada actual:', state.fechaSeleccionada);
+    await cargarFacturas();
+};
+
+// Función para verificar el estado
+window.debugEstado = function() {
+    console.log('🔍 Estado general:', {
+        fechaSeleccionada: state.fechaSeleccionada,
+        facturas: state.facturas?.length || 0,
+        ordenes: state.ordenes?.length || 0
+    });
+    
+    if (state.facturas && state.facturas.length > 0) {
+        console.log('🔍 Primeras 3 facturas:', state.facturas.slice(0, 3));
+    }
+};
+
+// ================== FIN FUNCIONES DE DEBUG ADICIONALES ==================
 
 // ============== SISTEMA DE NOTIFICACIONES ELEGANTES ==============
 
@@ -4182,6 +4237,21 @@ window.elegantConfirm = function(message, title = 'Confirmación') {
                     color: #6b7280;
                     line-height: 1.5;
                 }
+
+                .elegant-input {
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    margin-bottom: 20px;
+                    transition: border-color 0.2s;
+                }
+                
+                .elegant-input:focus {
+                    outline: none;
+                    border-color: #3b82f6;
+                }
                 
                 .elegant-confirm-buttons {
                     display: flex;
@@ -4254,6 +4324,70 @@ window.elegantConfirm = function(message, title = 'Confirmación') {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 window.handleConfirmResponse(false);
+            }
+        });
+    });
+};
+
+// Función de prompt elegante que reemplaza prompt()
+window.elegantPrompt = function(message, title = 'Información requerida', placeholder = '') {
+    return new Promise((resolve) => {
+        // Crear overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'elegant-confirm-overlay';
+        
+        // Crear modal
+        const modal = document.createElement('div');
+        modal.className = 'elegant-confirm-modal';
+        
+        modal.innerHTML = `
+            <div class="elegant-confirm-content">
+                <h3 class="elegant-confirm-title">${title}</h3>
+                <p class="elegant-confirm-message">${message}</p>
+                <input type="text" class="elegant-input" placeholder="${placeholder}" id="elegant-prompt-input">
+                <div class="elegant-confirm-buttons">
+                    <button class="elegant-btn elegant-btn-cancel" onclick="handlePromptResponse(null)">Cancelar</button>
+                    <button class="elegant-btn elegant-btn-confirm" onclick="handlePromptResponse(document.getElementById('elegant-prompt-input').value)">Aceptar</button>
+                </div>
+            </div>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Enfocar el input
+        setTimeout(() => {
+            const input = document.getElementById('elegant-prompt-input');
+            if (input) {
+                input.focus();
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        window.handlePromptResponse(input.value);
+                    }
+                });
+            }
+        }, 100);
+        
+        // Función global para manejar respuesta
+        window.handlePromptResponse = function(value) {
+            overlay.remove();
+            delete window.handlePromptResponse;
+            resolve(value);
+        };
+        
+        // Cerrar con ESC
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEsc);
+                window.handlePromptResponse(null);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+        
+        // Cerrar al hacer clic fuera del modal
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                window.handlePromptResponse(null);
             }
         });
     });
