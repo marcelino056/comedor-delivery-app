@@ -189,36 +189,133 @@ body {
     box-shadow: 0 0 0 1px #3b82f6;
 }
 
-@media (max-width: 480px) {
+/* Mejoras para móviles */
+@media (max-width: 640px) {
     .header {
-        padding: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        flex-direction: column;
+        gap: 0.5rem;
+        position: relative;
+    }
+    
+    .header-left {
+        width: 100%;
+        justify-content: space-between;
     }
     
     .empresa-info {
-        gap: 0.75rem;
+        gap: 0.5rem;
+        flex: 1;
     }
     
     .empresa-logo {
-        width: 45px;
-        height: 45px;
+        width: 35px;
+        height: 35px;
+    }
+    
+    .empresa-detalles {
+        gap: 0.1rem;
     }
     
     .header h1 {
-        font-size: 1.2rem;
+        font-size: 1rem;
+        line-height: 1.1;
     }
     
     .empresa-meta {
         font-size: 0.6rem;
+        gap: 0.05rem;
+    }
+    
+    /* Ocultar algunos elementos en móvil para reducir carga visual */
+    .empresa-direccion {
+        display: none;
+    }
+    
+    .btn-config {
+        padding: 0.4rem;
+        font-size: 0.7rem;
+        min-width: auto;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     .fecha-controls {
-        flex-direction: column;
+        flex-direction: row;
         gap: 0.25rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
     }
     
     .fecha-controls > div:first-child {
         display: flex;
-        gap: 0.5rem;
+        gap: 0.25rem;
+        align-items: center;
+    }
+    
+    .fecha-controls button {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+        min-width: auto;
+    }
+    
+    #fecha-selector {
+        font-size: 0.7rem;
+        padding: 0.25rem;
+        height: 28px;
+        min-width: 100px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        padding: 0.4rem 0.5rem;
+    }
+    
+    .empresa-info {
+        gap: 0.4rem;
+    }
+    
+    .empresa-logo {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .header h1 {
+        font-size: 0.9rem;
+    }
+    
+    .empresa-meta {
+        font-size: 0.55rem;
+    }
+    
+    /* En móviles muy pequeños, mostrar solo lo esencial */
+    .empresa-telefono {
+        display: none;
+    }
+    
+    .btn-config {
+        width: 28px;
+        height: 28px;
+        font-size: 0.6rem;
+    }
+    
+    .fecha-controls {
+        gap: 0.2rem;
+    }
+    
+    .fecha-controls button {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.65rem;
+    }
+    
+    #fecha-selector {
+        font-size: 0.65rem;
+        min-width: 90px;
     }
 }
 
@@ -258,6 +355,54 @@ body {
     font-size: 1.25rem;
 }
 
+/* Tabs responsivos para móviles */
+@media (max-width: 640px) {
+    .nav-tabs {
+        top: auto; /* Ajustar según el header compacto */
+        position: sticky;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    
+    .nav-tabs::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .tab-btn {
+        padding: 0.5rem 0.3rem;
+        font-size: 0.65rem;
+        min-width: 60px;
+        gap: 0.15rem;
+        flex-shrink: 0;
+    }
+    
+    .tab-btn .icon {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tab-btn {
+        padding: 0.4rem 0.2rem;
+        font-size: 0.6rem;
+        min-width: 55px;
+        gap: 0.1rem;
+    }
+    
+    .tab-btn .icon {
+        font-size: 0.9rem;
+    }
+    
+    /* En pantallas muy pequeñas, hacer los tabs más compactos */
+    .tab-btn {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
+}
+
 /* Content */
 .content {
     flex: 1;
@@ -290,6 +435,49 @@ body {
 .header-buttons {
     display: flex;
     gap: 0.5rem;
+}
+
+/* Contenido responsivo para móviles */
+@media (max-width: 640px) {
+    .tab-content {
+        padding: 0.75rem;
+    }
+    
+    .tab-header {
+        margin-bottom: 0.75rem;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    
+    .tab-header h2 {
+        font-size: 1.1rem;
+        text-align: center;
+    }
+    
+    .header-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tab-content {
+        padding: 0.5rem;
+    }
+    
+    .tab-header {
+        margin-bottom: 0.5rem;
+    }
+    
+    .tab-header h2 {
+        font-size: 1rem;
+    }
+    
+    .header-buttons {
+        gap: 0.3rem;
+    }
 }
 
 /* Buttons */
