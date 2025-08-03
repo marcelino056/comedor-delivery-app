@@ -5,8 +5,6 @@ const PDFDocument = require('pdfkit');
 const WebSocket = require('ws');
 const { getStartOfDay, getEndOfDay, getLocalDate } = require('../utils/dateUtils');
 
-const { calculateTaxes } = require('../services/facturaService');
-
 module.exports = {
   async obtenerVentas(req, res) {
     try {
