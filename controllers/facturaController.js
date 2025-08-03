@@ -1,6 +1,7 @@
 const Factura = require('../models/Factura');
 const Cliente = require('../models/Cliente');
 const ConfiguracionEmpresa = require('../models/ConfiguracionEmpresa');
+const { getLocalDate } = require('../utils/dateUtils');
 
 module.exports = {
   async getAll(req, res) {
@@ -201,7 +202,7 @@ module.exports = {
         // Marcar conduces como pagados
         await Conduce.updateMany(
           { _id: { $in: conducesIds } },
-          { estado: 'pagado', fechaPago: new Date() }
+          { estado: 'pagado', fechaPago: getLocalDate() }
         );
         
         // Actualizar saldo del cliente si existe
@@ -229,7 +230,7 @@ module.exports = {
         tipoComprobante: tipoComprobante || 'BOLETA',
         esComprobanteFiscal: esComprobanteFiscal || false,
         metodoPago: metodoPago || 'efectivo',
-        fechaEmision: fechaEmision ? new Date(fechaEmision) : new Date()
+        fechaEmision: fechaEmision ? new Date(fechaEmision) : getLocalDate()
       };
       
       // Si es factura de delivery, usar datos directos
@@ -468,7 +469,7 @@ module.exports = {
       // Título del reporte
       doc.fontSize(16).text('REPORTE MENSUAL DE FACTURAS CON RNC', 50, 125);
       doc.fontSize(12).text(`Período: ${mes}/${anio}`, 50, 145);
-      doc.text(`Generado: ${new Date().toLocaleDateString('es-DO')}`, 50, 160);
+      doc.text(`Generado: ${getLocalDate().toLocaleDateString('es-DO')}`, 50, 160);
 
       // Tabla
       let yPosition = 185;

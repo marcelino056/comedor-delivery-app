@@ -1,5 +1,6 @@
 // Modelo de Venta para Mongoose (ventas de mostrador)
 const mongoose = require('mongoose');
+const { getLocalDate } = require('../utils/dateUtils');
 
 const ventaSchema = new mongoose.Schema({
   numero: String,
@@ -16,7 +17,7 @@ const ventaSchema = new mongoose.Schema({
   impuesto: Number,
   total: Number,
   estado: { type: String, default: 'pagada' },
-  fecha: { type: Date, default: Date.now },
+  fecha: { type: Date, default: getLocalDate },
   metodoPago: { type: String, default: 'efectivo' },
   observaciones: String
 });

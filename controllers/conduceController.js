@@ -1,6 +1,7 @@
 const Conduce = require('../models/Conduce');
 const Cliente = require('../models/Cliente');
 const ConfiguracionEmpresa = require('../models/ConfiguracionEmpresa');
+const { getLocalDate, addDays } = require('../utils/dateUtils');
 
 module.exports = {
   async getAll(req, res) {
@@ -53,8 +54,7 @@ module.exports = {
       }
       const count = await Conduce.countDocuments();
       const numeroConduce = `CON-${(count + 1).toString().padStart(6, '0')}`;
-      const fechaVencimiento = new Date();
-      fechaVencimiento.setDate(fechaVencimiento.getDate() + (diasVencimiento || cliente.diasCredito));
+      const fechaVencimiento = addDays(getLocalDate(), diasVencimiento || cliente.diasCredito);
       const conduce = new Conduce({
         numero: numeroConduce,
         cliente: clienteId,

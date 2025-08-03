@@ -1,19 +1,22 @@
 const Venta = require('../models/Venta');
-const Cliente = require('../models/Cliente');
+const Orden = require('../models/Orden');
+const ConfiguracionEmpresa = require('../models/ConfiguracionEmpresa');
+const PDFDocument = require('pdfkit');
+const WebSocket = require('ws');
+const { getStartOfDay, getEndOfDay, getLocalDate } = require('../utils/dateUtils');
+
+const { calculateTaxes } = require('../services/facturaService');
 
 module.exports = {
-  async getAll(req, res) {
+  async obtenerVentas(req, res) {
     try {
-      console.log('[VENTAS] Consultando todas las ventas. Query:', req.query);
-      const query = {};
+      let query = {};
       // Filtrar por fecha si se recibe ?fecha=YYYY-MM-DD
       if (req.query && req.query.fecha) {
         const fecha = req.query.fecha;
-        // Usar el mismo método que el reporte para consistencia con zona horaria
-        const startLocal = new Date(fecha + 'T00:00:00');
-        const endLocal = new Date(fecha + 'T23:59:59.999');
-        const start = new Date(startLocal.toISOString());
-        const end = new Date(endLocal.toISOString());
+        // Usar funciones estandarizadas de fecha para consistencia con zona horaria
+        const start = getStartOfDay(fecha);
+        const end = getEndOfDay(fecha);
         
         console.log(`[VENTAS][DEBUG] Filtrando por fecha local: ${fecha}, rango UTC: ${start.toISOString()} a ${end.toISOString()}`);
         query.fecha = { $gte: start, $lte: end };
@@ -25,7 +28,7 @@ module.exports = {
       const ventasNormalizadas = ventas.map(v => {
         const ventaObj = v.toObject();
         ventaObj.monto = Number(ventaObj.total) || 0;
-        let fechaBase = ventaObj.fecha || ventaObj.createdAt || new Date();
+        let fechaBase = ventaObj.fecha || ventaObj.createdAt || getLocalDate();
         ventaObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
         return ventaObj;
       });
@@ -80,7 +83,7 @@ module.exports = {
       const ventaObj = venta.toObject();
       ventaObj.monto = Number(ventaObj.total) || 0; // Asegura número
       // timestamp: siempre string ISO
-      let fechaBase = ventaObj.fecha || ventaObj.createdAt || new Date();
+      let fechaBase = ventaObj.fecha || ventaObj.createdAt || getLocalDate();
       ventaObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
       console.log('[VENTAS] Venta creada:', venta.numero, ventaObj);
       // Emitir por WebSocket

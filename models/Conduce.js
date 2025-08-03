@@ -1,5 +1,6 @@
 // Modelo de Conduce para Mongoose
 const mongoose = require('mongoose');
+const { getLocalDate } = require('../utils/dateUtils');
 
 const conduceSchema = new mongoose.Schema({
   numero: String,
@@ -17,7 +18,7 @@ const conduceSchema = new mongoose.Schema({
   total: Number,
   esComprobanteFiscal: { type: Boolean, default: false },
   estado: { type: String, default: 'pendiente' },
-  fechaCreacion: { type: Date, default: Date.now },
+  fechaCreacion: { type: Date, default: getLocalDate },
   fechaVencimiento: Date
 });
 

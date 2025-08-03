@@ -6,6 +6,7 @@ const Orden = require('../models/Orden');
 const Conduce = require('../models/Conduce');
 const Factura = require('../models/Factura');
 const ConfiguracionEmpresa = require('../models/ConfiguracionEmpresa');
+const { getStartOfDay, getEndOfDay, getLocalDate } = require('../utils/dateUtils');
 const path = require('path');
 const fs = require('fs');
 
@@ -216,7 +217,7 @@ function generateReportHTML(data, configuracionEmpresa) {
     </div>
 
     <div class="footer">
-        <p>Reporte generado el ${new Date().toLocaleString('es-CO')} | Sistema de Gestión Comedor</p>
+        <p>Reporte generado el ${getLocalDate().toLocaleString('es-CO')} | Sistema de Gestión Comedor</p>
     </div>
 </body>
 </html>`;

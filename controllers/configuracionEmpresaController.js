@@ -1,4 +1,5 @@
 const ConfiguracionEmpresa = require('../models/ConfiguracionEmpresa');
+const { getLocalDate } = require('../utils/dateUtils');
 
 module.exports = {
   // Obtener configuración de empresa
@@ -46,7 +47,7 @@ module.exports = {
         config.telefono = telefono || config.telefono;
         config.rnc = rnc || config.rnc;
         config.logo = logo !== undefined ? logo : config.logo;
-        config.fechaActualizacion = new Date();
+        config.fechaActualizacion = getLocalDate();
       }
       
       console.log('[CONFIG-EMPRESA] Datos a guardar:', config.toObject());

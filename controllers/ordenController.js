@@ -1,4 +1,5 @@
 const Orden = require('../models/Orden');
+const { getStartOfDay, getEndOfDay, getLocalDate } = require('../utils/dateUtils');
 
 module.exports = {
   async getAll(req, res) {
@@ -8,11 +9,9 @@ module.exports = {
       // Filtrar por fecha si se recibe ?fecha=YYYY-MM-DD
       if (req.query && req.query.fecha) {
         const fecha = req.query.fecha;
-        // Usar el mismo método que las ventas para consistencia con zona horaria
-        const startLocal = new Date(fecha + 'T00:00:00');
-        const endLocal = new Date(fecha + 'T23:59:59.999');
-        const start = new Date(startLocal.toISOString());
-        const end = new Date(endLocal.toISOString());
+        // Usar funciones estandarizadas de fecha para consistencia con zona horaria
+        const start = getStartOfDay(fecha);
+        const end = getEndOfDay(fecha);
         
         console.log(`[ORDENES][DEBUG] Filtrando por fecha local: ${fecha}, rango UTC: ${start.toISOString()} a ${end.toISOString()}`);
         query.timestamp = { $gte: start, $lte: end };
@@ -23,7 +22,7 @@ module.exports = {
       const ordenesNormalizadas = ordenes.map(o => {
         const ordenObj = o.toObject();
         // Asegurar que timestamp sea string ISO
-        let fechaBase = ordenObj.timestamp || ordenObj.createdAt || new Date();
+        let fechaBase = ordenObj.timestamp || ordenObj.createdAt || getLocalDate();
         ordenObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
         return ordenObj;
       });
@@ -66,7 +65,7 @@ module.exports = {
       
       // Normalizar timestamp para frontend
       const ordenObj = orden.toObject();
-      let fechaBase = ordenObj.timestamp || ordenObj.createdAt || new Date();
+      let fechaBase = ordenObj.timestamp || ordenObj.createdAt || getLocalDate();
       ordenObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
       
       console.log('[ORDENES] Orden creada:', orden._id, ordenObj);

@@ -1,5 +1,6 @@
 // Modelo de Factura para Mongoose
 const mongoose = require('mongoose');
+const { getLocalDate } = require('../utils/dateUtils');
 
 const facturaSchema = new mongoose.Schema({
   numero: String,
@@ -16,7 +17,7 @@ const facturaSchema = new mongoose.Schema({
   impuesto: Number,
   total: Number,
   estado: { type: String, default: 'pagada' },
-  fechaEmision: { type: Date, default: Date.now },
+  fechaEmision: { type: Date, default: getLocalDate },
   rnc: String,
   tipoComprobante: String,
   

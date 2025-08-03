@@ -1,4 +1,5 @@
 const Gasto = require('../models/Gasto');
+const { getStartOfDay, getEndOfDay, getLocalDate } = require('../utils/dateUtils');
 
 module.exports = {
   async getAll(req, res) {
@@ -6,16 +7,11 @@ module.exports = {
       console.log('[GASTOS] Consultando todos los gastos. Query:', req.query);
       const query = {};
       // Filtrar por fecha si se recibe ?fecha=YYYY-MM-DD
-      // IMPORTANTE: Manejar zona horaria correctamente
       if (req.query && req.query.fecha) {
-        const fecha = req.query.fecha; // YYYY-MM-DD en hora local
-        // Convertir fecha local a rango UTC para la consulta
-        const startLocal = new Date(fecha + 'T00:00:00'); // Inicio del día en hora local
-        const endLocal = new Date(fecha + 'T23:59:59.999'); // Final del día en hora local
-        
-        // Convertir a UTC para consultar la base de datos
-        const start = new Date(startLocal.toISOString());
-        const end = new Date(endLocal.toISOString());
+        const fecha = req.query.fecha;
+        // Usar funciones estandarizadas de fecha para consistencia con zona horaria
+        const start = getStartOfDay(fecha);
+        const end = getEndOfDay(fecha);
         
         console.log('[GASTOS][DEBUG] Filtrando fecha local:', fecha);
         console.log('[GASTOS][DEBUG] Rango UTC para consulta:', start.toISOString(), 'a', end.toISOString());
@@ -28,7 +24,7 @@ module.exports = {
       const gastosNormalizados = gastos.map(g => {
         const gastoObj = g.toObject();
         // Asegurar que timestamp sea string ISO
-        let fechaBase = gastoObj.timestamp || gastoObj.createdAt || new Date();
+        let fechaBase = gastoObj.timestamp || gastoObj.createdAt || getLocalDate();
         gastoObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
         return gastoObj;
       });
@@ -66,7 +62,7 @@ module.exports = {
       
       // Normalizar timestamp para frontend
       const gastoObj = gasto.toObject();
-      let fechaBase = gastoObj.timestamp || gastoObj.createdAt || new Date();
+      let fechaBase = gastoObj.timestamp || gastoObj.createdAt || getLocalDate();
       gastoObj.timestamp = (fechaBase instanceof Date ? fechaBase : new Date(fechaBase)).toISOString();
       
       console.log('[GASTOS] Gasto creado:', gasto._id, gastoObj);
