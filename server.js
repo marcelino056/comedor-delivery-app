@@ -62,6 +62,10 @@ app.use('/api/monto-inicial', montoInicialRoutes);
 const migracionRoutes = require('./routes/migracionRoutes');
 app.use('/api/migrate', migracionRoutes);
 
+// ============= RUTAS PARA LIMPIEZA DE BASE DE DATOS (ADMIN) =============
+const cleanRoutes = require('./routes/cleanRoutes');
+app.use('/api/admin/clean', cleanRoutes);
+
 // Servir archivos estáticos (JS, CSS, manifest, icons, etc.)
 app.use(express.static(path.join(__dirname, 'public')));
 
