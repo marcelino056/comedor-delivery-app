@@ -93,13 +93,26 @@ function createConduceCard(conduce) {
     
     // Calcular desglose fiscal si es necesario
     let desgloseFiscal = '';
-    if (esFiscal && conduce.subtotal && conduce.itbis) {
-        desgloseFiscal = `
-            <div class="conduce-desglose-fiscal">
-                <div><strong>Subtotal:</strong> ${window.APIModule.formatCurrency(conduce.subtotal)}</div>
-                <div><strong>ITBIS (18%):</strong> ${window.APIModule.formatCurrency(conduce.itbis)}</div>
-            </div>
-        `;
+    if (esFiscal) {
+        // Si tiene datos de subtotal e itbis del servidor, usar esos
+        let subtotal = conduce.subtotal;
+        let itbis = conduce.itbis;
+        
+        // Si no tiene datos del servidor, calcular a partir del total
+        if (!subtotal && !itbis && conduce.total) {
+            // Calcular subtotal e ITBIS a partir del total
+            subtotal = conduce.total / 1.18; // Total / (1 + 0.18)
+            itbis = conduce.total - subtotal;
+        }
+        
+        if (subtotal && itbis) {
+            desgloseFiscal = `
+                <div class="conduce-desglose-fiscal">
+                    <div><strong>Subtotal:</strong> ${window.APIModule.formatCurrency(subtotal)}</div>
+                    <div><strong>ITBIS (18%):</strong> ${window.APIModule.formatCurrency(itbis)}</div>
+                </div>
+            `;
+        }
     }
     
     return `
@@ -277,22 +290,31 @@ async function compartirConduce(conduce) {
 
 // Anular conduce
 async function anularConduce(conduceId) {
-    const motivo = await window.elegantPrompt(
-        'Motivo de anulación del conduce:',
-        'Anular Conduce',
-        'Ej: Error en pedido, cliente canceló, etc.'
-    );
-    if (!motivo) return;
+    // Verificar si elegantPrompt está disponible, si no usar prompt nativo como fallback
+    let motivo;
     
-    try {
-        window.APIModule.showLoading(true);
-        const response = await fetch(`${window.APIModule.API_BASE}/conduces/${conduceId}/anular`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ motivo })
-        });
+    if (window.elegantPrompt) {
+        motivo = await window.elegantPrompt(
+            'Motivo de anulación del conduce:',
+            'Anular Conduce',
+            'Ej: Error en pedido, cliente canceló, etc.'
+        );
+    } else {
+        // Fallback al prompt nativo si elegantPrompt no está disponible
+        motivo = prompt('Motivo de anulación del conduce:', 'Ej: Error en pedido, cliente canceló, etc.');
+    }
+    
+    if (!motivo || motivo.trim() === '') return;
+        
+        try {
+            window.APIModule.showLoading(true);
+            const response = await fetch(`${window.APIModule.API_BASE}/conduces/${conduceId}/anular`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ motivo: motivo.trim() })
+            });
         
         if (!response.ok) {
             const error = await response.json();
