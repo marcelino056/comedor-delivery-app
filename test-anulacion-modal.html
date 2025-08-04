@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Modal Anulación</title>
+    <link rel="stylesheet" href="public/style.css">
+</head>
+<body>
+    <div style="padding: 2rem; max-width: 800px; margin: 0 auto;">
+        <h1>Prueba del Modal de Anulación Mejorado</h1>
+        
+        <div style="margin: 2rem 0;">
+            <button onclick="testPrompt()" class="btn-primary" style="padding: 1rem 2rem; margin: 1rem; border-radius: 0.5rem; border: none; background: #3b82f6; color: white; cursor: pointer;">
+                🧪 Probar Modal de Anulación
+            </button>
+            
+            <button onclick="testConfirm()" class="btn-secondary" style="padding: 1rem 2rem; margin: 1rem; border-radius: 0.5rem; border: 1px solid #d1d5db; background: #f3f4f6; color: #374151; cursor: pointer;">
+                ✅ Probar Modal de Confirmación
+            </button>
+        </div>
+
+        <div id="resultado" style="margin-top: 2rem; padding: 1rem; background: #f9fafb; border-radius: 0.5rem; border: 1px solid #e5e7eb;">
+            <h3>Resultado:</h3>
+            <p id="output">Haz clic en un botón para probar los modales</p>
+        </div>
+    </div>
+
+    <script src="public/modules/ui.js"></script>
+    <script>
+        // Funciones de prueba
+        async function testPrompt() {
+            const output = document.getElementById('output');
+            output.textContent = 'Abriendo modal de anulación...';
+            
+            try {
+                const motivo = await window.elegantPrompt(
+                    '¿Está seguro que desea anular el conduce del cliente <strong>Juan Pérez</strong> por un valor de <strong>$2,500.00</strong>?<br><br>Por favor, ingrese el motivo de la anulación:',
+                    '⚠️ Anular Conduce a Crédito',
+                    'Ej: Error en pedido, cliente canceló, producto no disponible, etc.'
+                );
+                
+                if (motivo) {
+                    output.innerHTML = `<strong>✅ Motivo ingresado:</strong><br>"${motivo}"`;
+                } else {
+                    output.textContent = '❌ Anulación cancelada';
+                }
+            } catch (error) {
+                output.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testConfirm() {
+            const output = document.getElementById('output');
+            output.textContent = 'Abriendo modal de confirmación...';
+            
+            try {
+                const confirmed = await window.elegantConfirm(
+                    'Esta es una operación crítica que no se puede deshacer.\n\n¿Está seguro que desea continuar?',
+                    'Confirmar Operación',
+                    'Esta acción es irreversible'
+                );
+                
+                if (confirmed) {
+                    output.textContent = '✅ Operación confirmada';
+                } else {
+                    output.textContent = '❌ Operación cancelada';
+                }
+            } catch (error) {
+                output.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Función de notificación simple para pruebas
+        window.notify = {
+            success: (msg) => {
+                const output = document.getElementById('output');
+                output.innerHTML += `<br><span style="color: #059669;">✅ ${msg}</span>`;
+            },
+            error: (msg) => {
+                const output = document.getElementById('output');
+                output.innerHTML += `<br><span style="color: #dc2626;">❌ ${msg}</span>`;
+            },
+            warning: (msg) => {
+                const output = document.getElementById('output');
+                output.innerHTML += `<br><span style="color: #d97706;">⚠️ ${msg}</span>`;
+            }
+        };
+    </script>
+</body>
+</html>

@@ -91,29 +91,34 @@ function createConduceCard(conduce) {
     const fechaStr = fecha.toLocaleDateString('es-CO');
     const esFiscal = conduce.esComprobanteFiscal || false;
     
-    // Calcular desglose fiscal si es necesario
-    let desgloseFiscal = '';
-    if (esFiscal) {
-        // Si tiene datos de subtotal e itbis del servidor, usar esos
-        let subtotal = conduce.subtotal;
-        let itbis = conduce.itbis;
-        
-        // Si no tiene datos del servidor, calcular a partir del total
-        if (!subtotal && !itbis && conduce.total) {
-            // Calcular subtotal e ITBIS a partir del total
+    // Obtener o calcular el desglose de totales
+    let subtotal = conduce.subtotal;
+    let itbis = conduce.itbis || conduce.impuesto; // Compatibilidad con ambos nombres
+    
+    // Si no tenemos los datos del servidor, calcular a partir del total
+    if ((!subtotal || !itbis) && conduce.total) {
+        if (esFiscal) {
+            // Para conduces fiscales, calcular subtotal e ITBIS a partir del total
             subtotal = conduce.total / 1.18; // Total / (1 + 0.18)
             itbis = conduce.total - subtotal;
-        }
-        
-        if (subtotal && itbis) {
-            desgloseFiscal = `
-                <div class="conduce-desglose-fiscal">
-                    <div><strong>Subtotal:</strong> ${window.APIModule.formatCurrency(subtotal)}</div>
-                    <div><strong>ITBIS (18%):</strong> ${window.APIModule.formatCurrency(itbis)}</div>
-                </div>
-            `;
+        } else {
+            // Para conduces simples, todo es subtotal, ITBIS = 0
+            subtotal = conduce.total;
+            itbis = 0;
         }
     }
+    
+    // Asegurar valores por defecto
+    subtotal = subtotal || 0;
+    itbis = itbis || 0;
+    
+    // Crear el desglose fiscal (siempre mostrar para claridad)
+    const desgloseFiscal = `
+        <div class="conduce-desglose-fiscal">
+            <div><strong>Subtotal:</strong> ${window.APIModule.formatCurrency(subtotal)}</div>
+            <div><strong>ITBIS (18%):</strong> ${window.APIModule.formatCurrency(itbis)}</div>
+        </div>
+    `;
     
     return `
         <div class="conduce-card">
@@ -290,43 +295,88 @@ async function compartirConduce(conduce) {
 
 // Anular conduce
 async function anularConduce(conduceId) {
-    // Verificar si elegantPrompt está disponible, si no usar prompt nativo como fallback
-    let motivo;
-    
-    if (window.elegantPrompt) {
-        motivo = await window.elegantPrompt(
-            'Motivo de anulación del conduce:',
-            'Anular Conduce',
-            'Ej: Error en pedido, cliente canceló, etc.'
+    try {
+        // Buscar información del conduce para mostrar en el modal
+        const conduces = window.StateModule.state.conduces || [];
+        const conduce = conduces.find(c => c._id === conduceId);
+        const clienteNombre = conduce?.cliente?.nombre || 'Cliente desconocido';
+        const conduceTotal = conduce?.total ? window.APIModule.formatCurrency(conduce.total) : '$0.00';
+        
+        // Verificar si elegantPrompt está disponible
+        let motivo;
+        
+        if (window.elegantPrompt) {
+            motivo = await window.elegantPrompt(
+                `¿Está seguro que desea anular el conduce del cliente <strong>${clienteNombre}</strong> por un valor de <strong>${conduceTotal}</strong>?<br><br>Por favor, ingrese el motivo de la anulación:`,
+                '⚠️ Anular Conduce a Crédito',
+                'Ej: Error en pedido, cliente canceló, producto no disponible, etc.',
+                'anulacion'
+            );
+        } else {
+            // Fallback al prompt nativo si elegantPrompt no está disponible
+            motivo = prompt(
+                `Anular conduce de ${clienteNombre} (${conduceTotal})\n\nMotivo de anulación:`, 
+                'Ej: Error en pedido, cliente canceló, etc.'
+            );
+        }
+        
+        // Validar que se ingresó un motivo
+        if (!motivo || motivo.trim() === '') {
+            console.log('[CREDITOS] Anulación cancelada - no se proporcionó motivo');
+            return;
+        }
+        
+        // Validar longitud mínima del motivo
+        if (motivo.trim().length < 10) {
+            window.notify.warning('El motivo debe tener al menos 10 caracteres');
+            return;
+        }
+        
+        // Mostrar confirmación adicional para operaciones críticas
+        const confirmarAnulacion = await window.elegantConfirm(
+            `¿Confirma que desea anular este conduce?\n\nMotivo: "${motivo.trim()}"`,
+            'Confirmar Anulación',
+            'Esta acción no se puede deshacer'
         );
-    } else {
-        // Fallback al prompt nativo si elegantPrompt no está disponible
-        motivo = prompt('Motivo de anulación del conduce:', 'Ej: Error en pedido, cliente canceló, etc.');
-    }
+        
+        if (!confirmarAnulacion) {
+            console.log('[CREDITOS] Anulación cancelada por el usuario');
+            return;
+        }
+        
+        // Proceder con la anulación
+        window.APIModule.showLoading(true, 'Anulando conduce...');
+        
+        const response = await fetch(`${window.APIModule.API_BASE}/conduces/${conduceId}/anular`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ motivo: motivo.trim() })
+        });
     
-    if (!motivo || motivo.trim() === '') return;
-        
-        try {
-            window.APIModule.showLoading(true);
-            const response = await fetch(`${window.APIModule.API_BASE}/conduces/${conduceId}/anular`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ motivo: motivo.trim() })
-            });
-        
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al anular conduce');
         }
         
-        window.notify.success('Conduce anulado exitosamente');
+        const resultado = await response.json();
+        
+        // Mostrar mensaje de éxito con detalles
+        window.notify.success(`Conduce anulado exitosamente\nMotivo: ${motivo.trim()}`);
+        
+        // Recargar la lista de créditos
         await loadCreditos();
         
+        console.log('[CREDITOS] ✅ Conduce anulado exitosamente:', {
+            conduceId,
+            motivo: motivo.trim(),
+            cliente: clienteNombre
+        });
+        
     } catch (error) {
-        console.error('Error anulando conduce:', error);
-        window.notify.error(error.message);
+        console.error('[CREDITOS] ❌ Error anulando conduce:', error);
+        window.notify.error(`Error al anular conduce: ${error.message}`);
     } finally {
         window.APIModule.showLoading(false);
     }
@@ -574,14 +624,27 @@ async function guardarConduce(event) {
             return;
         }
         
+        // Calcular totales
+        const subtotalBruto = productos.reduce((sum, p) => sum + p.total, 0);
+        const itbis = esComprobanteFiscal ? subtotalBruto * 0.18 : 0;
+        const totalFinal = subtotalBruto + itbis;
+        
         const conduceData = {
             clienteId,
             productos,
+            subtotal: Number(subtotalBruto.toFixed(2)),
+            impuesto: Number(itbis.toFixed(2)),
+            total: Number(totalFinal.toFixed(2)),
             esComprobanteFiscal,
             fechaCreacion: window.StateModule.state.fechaSeleccionada || window.StateModule.getLocalDateString()
         };
         
-        console.log('📋 Datos del conduce a enviar:', conduceData);
+        console.log('📋 Datos del conduce a enviar:', {
+            ...conduceData,
+            subtotalCalculado: subtotalBruto,
+            itbisCalculado: itbis,
+            totalCalculado: totalFinal
+        });
         
         window.APIModule.showLoading(true);
         
@@ -743,6 +806,27 @@ function createConduceCheckboxItem(conduce) {
     const fecha = new Date(conduce.fechaCreacion).toLocaleDateString('es-CO');
     const esFiscal = conduce.esComprobanteFiscal || false;
     
+    // Obtener o calcular el desglose de totales
+    let subtotal = conduce.subtotal;
+    let itbis = conduce.itbis || conduce.impuesto; // Compatibilidad con ambos nombres
+    
+    // Si no tenemos los datos del servidor, calcular a partir del total
+    if ((!subtotal || !itbis) && conduce.total) {
+        if (esFiscal) {
+            // Para conduces fiscales, calcular subtotal e ITBIS a partir del total
+            subtotal = conduce.total / 1.18; // Total / (1 + 0.18)
+            itbis = conduce.total - subtotal;
+        } else {
+            // Para conduces simples, todo es subtotal, ITBIS = 0
+            subtotal = conduce.total;
+            itbis = 0;
+        }
+    }
+    
+    // Asegurar valores por defecto
+    subtotal = subtotal || 0;
+    itbis = itbis || 0;
+    
     return `
         <div class="conduce-item" data-es-fiscal="${esFiscal}">
             <label class="conduce-checkbox-label">
@@ -758,6 +842,16 @@ function createConduceCheckboxItem(conduce) {
                             '<span class="conduce-fiscal-badge">📄 FISCAL</span>' : 
                             '<span class="conduce-simple-badge">🧾 SIMPLE</span>'
                         }
+                    </div>
+                    <div class="conduce-desglose-pago">
+                        <div class="desglose-item">
+                            <span>Subtotal:</span>
+                            <span>${window.APIModule.formatCurrency(subtotal)}</span>
+                        </div>
+                        <div class="desglose-item">
+                            <span>ITBIS:</span>
+                            <span>${window.APIModule.formatCurrency(itbis)}</span>
+                        </div>
                     </div>
                     <div class="conduce-productos-resumen">
                         ${conduce.productos.map(p => `${p.cantidad}x ${p.descripcion}`).join(', ')}

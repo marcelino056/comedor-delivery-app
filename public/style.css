@@ -2892,6 +2892,30 @@ body {
     font-size: 0.875rem;
 }
 
+.conduce-desglose-fiscal {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    grid-column: 1 / -1;
+}
+
+.conduce-desglose-fiscal > div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.conduce-desglose-fiscal > div:last-child {
+    margin-bottom: 0;
+}
+
+.conduce-desglose-fiscal strong {
+    color: #374151;
+}
+
 .conduce-productos {
     background: #f9fafb;
     border-radius: 4px;
@@ -3056,6 +3080,30 @@ body {
     align-items: center;
     font-size: 0.875rem;
     margin: 0.25rem 0;
+}
+
+.conduce-desglose-pago {
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    font-size: 0.8rem;
+    color: #4b5563;
+}
+
+.conduce-desglose-pago .desglose-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0.15rem 0;
+}
+
+.conduce-desglose-pago .desglose-total {
+    font-weight: bold;
+    color: #111827;
+    border-top: 1px solid #d1d5db;
+    padding-top: 0.25rem;
+    margin-top: 0.25rem;
 }
 
 /* Responsive para créditos */
@@ -3541,4 +3589,257 @@ body {
     margin-top: 2px;
 }
 
-/* ============== FIN ESTILOS FACTURA DELIVERY ==============
+/* ============== FIN ESTILOS FACTURA DELIVERY ============== */
+
+/* ============== MODAL DE PROMPT ELEGANTE ============== */
+.elegant-confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    z-index: 10002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.elegant-confirm-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.elegant-confirm-modal {
+    background: white;
+    border-radius: 1.5rem;
+    padding: 0;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04),
+        0 0 0 1px rgba(0, 0, 0, 0.05);
+    transform: scale(0.9) translateY(20px);
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    overflow: hidden;
+}
+
+.elegant-confirm-overlay.show .elegant-confirm-modal {
+    transform: scale(1) translateY(0);
+}
+
+.elegant-confirm-content {
+    padding: 2rem;
+}
+
+.elegant-confirm-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.elegant-confirm-title::before {
+    content: "⚠️";
+    font-size: 2rem;
+    width: 3rem;
+    height: 3rem;
+    background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 3px solid #ffffff;
+    box-shadow: 0 4px 8px rgba(252, 211, 77, 0.3);
+    animation: gentlePulse 2s ease-in-out infinite;
+}
+
+/* Variantes del icono según el contexto */
+.elegant-confirm-modal.anulacion .elegant-confirm-title::before {
+    content: "🗑️";
+    background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%);
+    box-shadow: 0 4px 8px rgba(252, 165, 165, 0.3);
+}
+
+.elegant-confirm-modal.confirmacion .elegant-confirm-title::before {
+    content: "❓";
+    background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
+    box-shadow: 0 4px 8px rgba(147, 197, 253, 0.3);
+}
+
+.elegant-confirm-modal.error .elegant-confirm-title::before {
+    content: "❌";
+    background: linear-gradient(135deg, #fee2e2 0%, #f87171 100%);
+    box-shadow: 0 4px 8px rgba(248, 113, 113, 0.3);
+}
+
+.elegant-confirm-modal.success .elegant-confirm-title::before {
+    content: "✅";
+    background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%);
+    box-shadow: 0 4px 8px rgba(110, 231, 183, 0.3);
+}
+
+/* Animación sutil para el icono */
+@keyframes gentlePulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.elegant-confirm-message {
+    color: #6b7280;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+}
+
+.elegant-input {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 1rem;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: #f9fafb;
+    color: #1f2937;
+    font-family: inherit;
+    outline: none;
+    margin-bottom: 1.5rem;
+}
+
+.elegant-input:focus {
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 
+        0 0 0 3px rgba(59, 130, 246, 0.1),
+        0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.elegant-input::placeholder {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.elegant-confirm-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}
+
+.elegant-btn {
+    padding: 0.875rem 1.75rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    border: none;
+    font-size: 0.95rem;
+    position: relative;
+    overflow: hidden;
+    font-family: inherit;
+    outline: none;
+}
+
+.elegant-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.elegant-btn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+.elegant-btn-cancel {
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    color: #374151;
+    border: 2px solid #d1d5db;
+}
+
+.elegant-btn-cancel:hover {
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: #9ca3af;
+}
+
+.elegant-btn-confirm {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.elegant-btn-confirm:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+}
+
+.elegant-btn:active {
+    transform: translateY(0);
+}
+
+/* Animación de entrada para el prompt */
+@keyframes elegantPromptSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(40px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.elegant-confirm-modal.animate {
+    animation: elegantPromptSlideIn 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Responsive para dispositivos móviles */
+@media (max-width: 768px) {
+    .elegant-confirm-modal {
+        width: 95%;
+        margin: 1rem;
+    }
+    
+    .elegant-confirm-content {
+        padding: 1.5rem;
+    }
+    
+    .elegant-confirm-title {
+        font-size: 1.25rem;
+    }
+    
+    .elegant-confirm-buttons {
+        flex-direction: column;
+    }
+    
+    .elegant-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ============== FIN MODAL DE PROMPT ELEGANTE ============== */

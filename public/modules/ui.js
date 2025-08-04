@@ -525,13 +525,13 @@ window.elegantConfirm = function(message, title = 'Confirmación') {
 };
 
 // Función de prompt elegante
-window.elegantPrompt = function(message, title = 'Información requerida', placeholder = '') {
+window.elegantPrompt = function(message, title = 'Información requerida', placeholder = '', type = 'warning') {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.className = 'elegant-confirm-overlay';
         
         const modal = document.createElement('div');
-        modal.className = 'elegant-confirm-modal';
+        modal.className = `elegant-confirm-modal ${type}`;
         
         modal.innerHTML = `
             <div class="elegant-confirm-content">
@@ -539,8 +539,12 @@ window.elegantPrompt = function(message, title = 'Información requerida', place
                 <p class="elegant-confirm-message">${message}</p>
                 <input type="text" class="elegant-input" placeholder="${placeholder}" id="elegant-prompt-input">
                 <div class="elegant-confirm-buttons">
-                    <button class="elegant-btn elegant-btn-cancel" onclick="handlePromptResponse(null)">Cancelar</button>
-                    <button class="elegant-btn elegant-btn-confirm" onclick="handlePromptResponse(document.getElementById('elegant-prompt-input').value)">Aceptar</button>
+                    <button class="elegant-btn elegant-btn-cancel" onclick="handlePromptResponse(null)">
+                        Cancelar
+                    </button>
+                    <button class="elegant-btn elegant-btn-confirm" onclick="handlePromptResponse(document.getElementById('elegant-prompt-input').value)">
+                        Confirmar
+                    </button>
                 </div>
             </div>
         `;
@@ -548,24 +552,54 @@ window.elegantPrompt = function(message, title = 'Información requerida', place
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         
+        // Mostrar modal con animación
+        setTimeout(() => {
+            overlay.classList.add('show');
+            modal.classList.add('animate');
+        }, 10);
+        
+        // Configurar input y eventos
         setTimeout(() => {
             const input = document.getElementById('elegant-prompt-input');
             if (input) {
                 input.focus();
+                input.select();
+                
+                // Evento Enter para confirmar
                 input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        window.handlePromptResponse(input.value);
+                    if (e.key === 'Enter' && input.value.trim()) {
+                        window.handlePromptResponse(input.value.trim());
+                    }
+                });
+                
+                // Evento para validación en tiempo real
+                input.addEventListener('input', (e) => {
+                    const confirmBtn = modal.querySelector('.elegant-btn-confirm');
+                    if (e.target.value.trim()) {
+                        confirmBtn.style.opacity = '1';
+                        confirmBtn.style.pointerEvents = 'auto';
+                        confirmBtn.style.transform = 'translateY(0)';
+                    } else {
+                        confirmBtn.style.opacity = '0.6';
+                        confirmBtn.style.pointerEvents = 'none';
+                        confirmBtn.style.transform = 'translateY(1px)';
                     }
                 });
             }
         }, 100);
         
+        // Función para manejar respuesta
         window.handlePromptResponse = function(value) {
-            overlay.remove();
-            delete window.handlePromptResponse;
-            resolve(value);
+            overlay.classList.remove('show');
+            
+            setTimeout(() => {
+                overlay.remove();
+                delete window.handlePromptResponse;
+                resolve(value && value.trim() ? value.trim() : null);
+            }, 300);
         };
         
+        // Evento Escape para cancelar
         const handleEsc = (e) => {
             if (e.key === 'Escape') {
                 document.removeEventListener('keydown', handleEsc);
@@ -574,11 +608,23 @@ window.elegantPrompt = function(message, title = 'Información requerida', place
         };
         document.addEventListener('keydown', handleEsc);
         
+        // Click fuera del modal para cancelar
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 window.handlePromptResponse(null);
             }
         });
+        
+        // Inicializar estado del botón confirmar
+        setTimeout(() => {
+            const confirmBtn = modal.querySelector('.elegant-btn-confirm');
+            if (confirmBtn) {
+                confirmBtn.style.opacity = '0.6';
+                confirmBtn.style.pointerEvents = 'none';
+                confirmBtn.style.transform = 'translateY(1px)';
+                confirmBtn.style.transition = 'all 0.2s ease';
+            }
+        }, 150);
     });
 };
 

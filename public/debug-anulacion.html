@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Modal de Anulación</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem;
+            background: #f5f5f5;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .debug-container {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .btn-test {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            padding: 1rem 2rem;
+            margin: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-test:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-test.danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+        
+        .btn-test.danger:hover {
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+        }
+        
+        .btn-test.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-test.success:hover {
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+        
+        .debug-output {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .status-card.available {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+        
+        .status-card.unavailable {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+        
+        .status-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .status-label {
+            font-weight: 600;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔧 Debug - Modal de Anulación Mejorado</h1>
+        <p>Esta página permite probar la nueva funcionalidad del modal de anulación estético.</p>
+        
+        <div class="status-grid" id="status-grid">
+            <!-- Se llenará dinámicamente -->
+        </div>
+        
+        <div style="margin: 2rem 0;">
+            <button onclick="showSystemInfo()" class="btn-test">
+                📊 Verificar Sistema
+            </button>
+            
+            <button onclick="testSimplePrompt()" class="btn-test success">
+                🧪 Prueba Simple
+            </button>
+            
+            <button onclick="testAnulacionModal()" class="btn-test danger">
+                ⚠️ Prueba Anulación Completa
+            </button>
+            
+            <button onclick="clearOutput()" class="btn-test" style="background: #6b7280;">
+                🗑️ Limpiar Output
+            </button>
+        </div>
+        
+        <div class="debug-output" id="debug-output">
+Esperando comandos...\n\nFunciones disponibles:
+- showSystemInfo(): Verifica el estado del sistema
+- testSimplePrompt(): Prueba básica del prompt
+- testAnulacionModal(): Prueba completa del modal de anulación
+        </div>
+    </div>
+    
+    <!-- Scripts de la aplicación -->
+    <script src="modules/state.js"></script>
+    <script src="modules/api.js"></script>
+    <script src="modules/ui.js"></script>
+    <script src="test-anulacion.js"></script>
+    
+    <script>
+        // Función para mostrar el estado de los módulos
+        function updateStatusGrid() {
+            const modules = [
+                { name: 'elegantPrompt', available: !!window.elegantPrompt },
+                { name: 'elegantConfirm', available: !!window.elegantConfirm },
+                { name: 'notify', available: !!window.notify },
+                { name: 'StateModule', available: !!window.StateModule },
+                { name: 'CreditosModule', available: !!window.CreditosModule }
+            ];
+            
+            const grid = document.getElementById('status-grid');
+            grid.innerHTML = modules.map(module => `
+                <div class="status-card ${module.available ? 'available' : 'unavailable'}">
+                    <div class="status-icon">${module.available ? '✅' : '❌'}</div>
+                    <div class="status-label">${module.name}</div>
+                </div>
+            `).join('');
+        }
+        
+        // Función para limpiar el output
+        function clearOutput() {
+            document.getElementById('debug-output').textContent = 'Output limpiado.\n\n';
+        }
+        
+        // Override console.log para mostrar en el debug output
+        const originalConsoleLog = console.log;
+        const debugOutput = document.getElementById('debug-output');
+        
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            debugOutput.textContent += args.join(' ') + '\n';
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+        };
+        
+        // Crear sistema de notificaciones simple
+        window.notify = {
+            success: (msg) => {
+                console.log('✅ SUCCESS: ' + msg);
+            },
+            error: (msg) => {
+                console.log('❌ ERROR: ' + msg);
+            },
+            warning: (msg) => {
+                console.log('⚠️ WARNING: ' + msg);
+            }
+        };
+        
+        // Inicializar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Página de debug inicializada');
+            updateStatusGrid();
+            
+            // Verificar módulos cada segundo
+            setInterval(updateStatusGrid, 1000);
+        });
+        
+        // También exponemos las funciones globalmente por si no están en test-anulacion.js
+        window.showSystemInfo = window.showSystemInfo || function() {
+            console.log('📊 Verificando estado del sistema...');
+            updateStatusGrid();
+            
+            const info = {
+                elegantPrompt: !!window.elegantPrompt,
+                elegantConfirm: !!window.elegantConfirm,
+                notify: !!window.notify,
+                StateModule: !!window.StateModule,
+                CreditosModule: !!window.CreditosModule
+            };
+            
+            console.log('Estado de módulos:');
+            Object.entries(info).forEach(([key, value]) => {
+                console.log(`- ${key}: ${value ? '✅ Disponible' : '❌ No disponible'}`);
+            });
+        };
+    </script>
+</body>
+</html>
