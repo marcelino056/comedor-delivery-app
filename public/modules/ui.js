@@ -77,7 +77,19 @@ function updateCajaView() {
     const gastos = window.StateModule.state.gastos;
     const montoInicial = window.StateModule.state.montoInicial[fecha] || 0;
 
-    // Calcular totales por método de pago incluyendo facturas
+    // Incluir conduces que fueron pagados (facturados) en la fecha seleccionada
+    const conducesPagadosHoy = (window.StateModule.state.conduces || []).filter(c => {
+        // Incluir conduces que se convirtieron en facturas hoy
+        if (c.estado === 'pagado' && c.facturaId) {
+            const factura = facturas.find(f => f._id === c.facturaId);
+            if (factura && window.StateModule.getLocalDateString(factura.fechaEmision) === fecha) {
+                return true;
+            }
+        }
+        return false;
+    });
+
+    // Calcular totales por método de pago incluyendo facturas y créditos pagados
     const totalesPorMetodo = {};
     
     [...ventas, ...ordenes, ...facturas].forEach(item => {
@@ -96,6 +108,16 @@ function updateCajaView() {
         }
         totalesPorMetodo[metodo] += amount;
     });
+
+    // Nota: Los créditos ya están incluidos a través de las facturas que los pagaron
+
+    // Calcular créditos creados hoy
+    const creditosCreados = (window.StateModule.state.conduces || []).filter(c => {
+        const fechaCreacion = c.fechaCreacion || c.createdAt;
+        if (!fechaCreacion) return false;
+        return window.StateModule.getLocalDateString(fechaCreacion) === fecha && c.estado === 'pendiente';
+    });
+    const totalCreditosCreados = creditosCreados.reduce((sum, c) => sum + c.total, 0);
 
     const totalIngresos = Object.values(totalesPorMetodo).reduce((sum, val) => sum + val, 0);
     const totalGastos = gastos.reduce((sum, gasto) => sum + gasto.monto, 0);
@@ -126,6 +148,17 @@ function updateCajaView() {
     // Actualizar desglose por método de pago específico
     updateElement('tarjeta-total', totalesPorMetodo.tarjeta || 0);
     updateElement('transferencia-total', totalesPorMetodo.transferencia || 0);
+    
+    // Actualizar información de créditos creados hoy
+    updateElement('creditos-creados-total', totalCreditosCreados);
+    const creditosDetailsElement = document.getElementById('creditos-creados-details');
+    if (creditosDetailsElement) {
+        if (creditosCreados.length > 0) {
+            creditosDetailsElement.innerHTML = `${creditosCreados.length} conduces por ${window.APIModule.formatCurrency(totalCreditosCreados)}`;
+        } else {
+            creditosDetailsElement.innerHTML = 'No hay créditos creados hoy';
+        }
+    }
     
     // Actualizar contadores y detalles adicionales
     const totalTransacciones = ventas.length + ordenes.length + facturas.length;
