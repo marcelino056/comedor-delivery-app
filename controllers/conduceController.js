@@ -123,7 +123,7 @@ module.exports = {
       }
 
       // Información del conduce
-      doc.fontSize(16).text('CONDUCE DE CRÉDITO', 400, 50);
+      doc.fontSize(16).text('CONDUCE', 400, 50);
       doc.fontSize(12).text(`No: ${conduce.numero}`, 400, 75);
       doc.text(`Fecha: ${conduce.fechaEmision ? conduce.fechaEmision.toLocaleDateString('es-DO') : ''}`, 400, 90);
       doc.text(`Vence: ${conduce.fechaVencimiento ? conduce.fechaVencimiento.toLocaleDateString('es-DO') : ''}`, 400, 105);

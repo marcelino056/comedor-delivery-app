@@ -7,6 +7,7 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/style.css">
     <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Comedor & Delivery">
@@ -110,22 +111,6 @@
                         </div>
                     </div>
                     
-                    <!-- Teclado Numérico -->
-                    <div class="numeric-keypad">
-                        <button class="keypad-btn" onclick="agregarDigito('1')">1</button>
-                        <button class="keypad-btn" onclick="agregarDigito('2')">2</button>
-                        <button class="keypad-btn" onclick="agregarDigito('3')">3</button>
-                        <button class="keypad-btn" onclick="agregarDigito('4')">4</button>
-                        <button class="keypad-btn" onclick="agregarDigito('5')">5</button>
-                        <button class="keypad-btn" onclick="agregarDigito('6')">6</button>
-                        <button class="keypad-btn" onclick="agregarDigito('7')">7</button>
-                        <button class="keypad-btn" onclick="agregarDigito('8')">8</button>
-                        <button class="keypad-btn" onclick="agregarDigito('9')">9</button>
-                        <button class="keypad-btn keypad-clear" onclick="limpiarMonto()">C</button>
-                        <button class="keypad-btn" onclick="agregarDigito('0')">0</button>
-                        <button class="keypad-btn keypad-delete" onclick="borrarDigito()">⌫</button>
-                    </div>
-                    
                     <!-- Métodos de Pago -->
                     <div class="payment-methods-grid">
                         <button class="payment-method-btn efectivo" onclick="procesarVenta('efectivo')">
@@ -140,6 +125,22 @@
                             <span class="payment-icon">🏦</span>
                             <span class="payment-label">TRANSFERENCIA</span>
                         </button>
+                    </div>
+                    
+                    <!-- Teclado Numérico -->
+                    <div class="numeric-keypad">
+                        <button class="keypad-btn" onclick="agregarDigito('1')">1</button>
+                        <button class="keypad-btn" onclick="agregarDigito('2')">2</button>
+                        <button class="keypad-btn" onclick="agregarDigito('3')">3</button>
+                        <button class="keypad-btn" onclick="agregarDigito('4')">4</button>
+                        <button class="keypad-btn" onclick="agregarDigito('5')">5</button>
+                        <button class="keypad-btn" onclick="agregarDigito('6')">6</button>
+                        <button class="keypad-btn" onclick="agregarDigito('7')">7</button>
+                        <button class="keypad-btn" onclick="agregarDigito('8')">8</button>
+                        <button class="keypad-btn" onclick="agregarDigito('9')">9</button>
+                        <button class="keypad-btn keypad-clear" onclick="limpiarMonto()">C</button>
+                        <button class="keypad-btn" onclick="agregarDigito('0')">0</button>
+                        <button class="keypad-btn keypad-delete" onclick="borrarDigito()">⌫</button>
                     </div>
                 </div>
 
@@ -157,8 +158,9 @@
             <div id="ordenes-tab" class="tab-content">
                 <div class="tab-header">
                     <h2>Delivery</h2>
-                    <button class="btn-primary btn-circle" onclick="openModal('orden')">
+                    <button class="btn-primary" onclick="openModal('orden')">
                         <span class="icon">➕</span>
+                        Agregar Delivery
                     </button>
                 </div>
                 
@@ -526,21 +528,25 @@
             <div class="productos-section">
                 <div class="section-header">
                     <h4>Productos/Servicios</h4>
-                    <button type="button" class="btn-secondary btn-sm" onclick="agregarProducto()">+ Agregar Producto</button>
+                    <button type="button" class="btn-secondary btn-sm" onclick="agregarProductoFactura()">+ Agregar Producto</button>
                 </div>
                 <div id="productos-container">
                     <div class="producto-item">
                         <div class="form-row">
                             <div class="form-group">
+                                <label class="form-group-mobile-label">Descripción</label>
                                 <input type="text" placeholder="Descripción *" class="producto-descripcion" required>
                             </div>
                             <div class="form-group">
+                                <label class="form-group-mobile-label">Cantidad</label>
                                 <input type="number" placeholder="Cant." class="producto-cantidad" min="1" value="1" required>
                             </div>
                             <div class="form-group">
+                                <label class="form-group-mobile-label">Precio</label>
                                 <input type="number" placeholder="Precio" class="producto-precio" step="0.01" min="0" required>
                             </div>
                             <div class="form-group">
+                                <label class="form-group-mobile-label">Total</label>
                                 <input type="number" placeholder="Total" class="producto-total" readonly>
                             </div>
                         </div>

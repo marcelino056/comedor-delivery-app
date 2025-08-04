@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Comedor & Delivery</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .debug-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        .error { color: #ff4444; }
+        .success { color: #44ff44; }
+        .warning { color: #ffaa44; }
+        .log { color: #aaaaaa; }
+    </style>
+</head>
+<body>
+    <h1>Debug - Carga de Módulos</h1>
+    <div id="debug-output"></div>
+
+    <script>
+        const debugOutput = document.getElementById('debug-output');
+        
+        function log(message, type = 'log') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            debugOutput.appendChild(div);
+            console.log(message);
+        }
+
+        // Interceptar console.log para mostrar en la página
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        console.log = function(...args) {
+            log(args.join(' '), 'log');
+            originalLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            log('ERROR: ' + args.join(' '), 'error');
+            originalError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            log('WARN: ' + args.join(' '), 'warning');
+            originalWarn.apply(console, args);
+        };
+
+        // Verificar disponibilidad de módulos cada 500ms
+        let checkCount = 0;
+        const maxChecks = 20;
+        
+        const moduleChecker = setInterval(() => {
+            checkCount++;
+            
+            const modules = {
+                StateModule: window.StateModule,
+                APIModule: window.APIModule,
+                UIModule: window.UIModule,
+                WebSocketModule: window.WebSocketModule,
+                VentasModule: window.VentasModule,
+                OrdenesModule: window.OrdenesModule,
+                GastosModule: window.GastosModule,
+                ClientesModule: window.ClientesModule,
+                FacturasModule: window.FacturasModule,
+                CreditosModule: window.CreditosModule,
+                ConfiguracionModule: window.ConfiguracionModule,
+                ModalesModule: window.ModalesModule
+            };
+
+            log(`Check #${checkCount} - Módulos disponibles:`);
+            Object.entries(modules).forEach(([name, module]) => {
+                const status = module ? 'LOADED' : 'MISSING';
+                const type = module ? 'success' : 'error';
+                log(`  ${name}: ${status}`, type);
+                
+                if (module && name === 'UIModule') {
+                    const hasSetupEventListeners = typeof module.setupEventListeners === 'function';
+                    log(`    setupEventListeners: ${hasSetupEventListeners ? 'AVAILABLE' : 'MISSING'}`, hasSetupEventListeners ? 'success' : 'error');
+                }
+            });
+
+            if (checkCount >= maxChecks) {
+                clearInterval(moduleChecker);
+                log('Finalizado monitoreo de módulos', 'warning');
+            }
+        }, 500);
+
+        // Cargar app.js y monitorear
+        log('Iniciando carga de app.js...', 'log');
+        
+        const script = document.createElement('script');
+        script.src = './app.js';
+        script.onload = () => log('app.js cargado exitosamente', 'success');
+        script.onerror = (error) => log('Error cargando app.js: ' + error, 'error');
+        document.head.appendChild(script);
+        
+        // Manejar errores globales
+        window.addEventListener('error', (event) => {
+            log(`ERROR GLOBAL: ${event.message} en ${event.filename}:${event.lineno}`, 'error');
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            log(`PROMESA RECHAZADA: ${event.reason}`, 'error');
+        });
+    </script>
+</body>
+</html>

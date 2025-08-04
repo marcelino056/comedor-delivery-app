@@ -507,16 +507,34 @@ body {
 /* Botón circular para headers */
 .btn-primary.btn-circle {
     border-radius: 50%;
-    width: 48px;
-    height: 48px;
+    width: 50px;
+    height: 50px;
     padding: 0;
-    min-width: 48px;
-    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+    min-width: 50px;
+    background: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.btn-primary.btn-circle .icon {
+    font-size: 1.3rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
 }
 
 .btn-primary.btn-circle:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
+    background: #2563eb;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-primary.btn-circle:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 }
 
 .btn-secondary {
@@ -1426,7 +1444,7 @@ body {
 
 .venta-display {
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     padding: 1rem;
     background: #f8fafc;
     border-radius: 8px;
@@ -1453,7 +1471,7 @@ body {
 
 /* Botones de Montos Rápidos */
 .quick-amounts {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 .quick-amounts-label {
@@ -1505,7 +1523,7 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 0.75rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     max-width: 300px;
     margin-left: auto;
     margin-right: auto;
@@ -1690,51 +1708,78 @@ body {
 /* Responsive para panel de ventas */
 @media (max-width: 640px) {
     .nueva-venta-panel {
-        padding: 1rem;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .venta-display {
+        margin-bottom: 1rem;
+        padding: 0.75rem;
     }
     
     .venta-display-amount {
-        font-size: 2rem;
+        font-size: 1.8rem;
+        min-height: 2.5rem;
+    }
+    
+    /* Montos rápidos más compactos */
+    .quick-amounts {
+        margin-bottom: 0.75rem;
+    }
+    
+    .quick-amounts-label {
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
     }
     
     .quick-amounts-grid {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.4rem;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.3rem;
     }
     
     .quick-amount-btn {
-        padding: 0.6rem 0.4rem;
-        font-size: 0.75rem;
-        min-height: 45px;
+        padding: 0.4rem 0.25rem;
+        font-size: 0.7rem;
+        min-height: 35px;
+        border-radius: 6px;
     }
     
-    .numeric-keypad {
-        gap: 0.5rem;
-    }
-    
-    .keypad-btn {
-        min-height: 50px;
-        font-size: 1.25rem;
-    }
-    
+    /* Métodos de pago compactos */
     .payment-methods-grid {
-        grid-template-columns: 1fr;
-        gap: 0.75rem;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.4rem;
+        margin-bottom: 0.75rem;
     }
     
     .payment-method-btn {
-        padding: 1rem;
-        min-height: 80px;
-        flex-direction: row;
-        justify-content: center;
+        padding: 0.4rem 0.25rem;
+        min-height: 45px;
+        flex-direction: column;
+        gap: 0.15rem;
+        border-radius: 6px;
     }
     
     .payment-icon {
-        font-size: 1.5rem;
+        font-size: 1rem;
     }
     
     .payment-label {
-        font-size: 0.75rem;
+        font-size: 0.6rem;
+        font-weight: 600;
+        line-height: 1;
+    }
+    
+    /* Teclado numérico más compacto */
+    .numeric-keypad {
+        gap: 0.4rem;
+        margin-bottom: 0.75rem;
+        max-width: 250px;
+    }
+    
+    .keypad-btn {
+        min-height: 45px;
+        font-size: 1.1rem;
+        border-radius: 6px;
     }
 }
 
@@ -1756,6 +1801,81 @@ body {
     
     .modal {
         padding: 0.5rem;
+    }
+    
+    /* Botón circular simple en móvil */
+    .btn-primary.btn-circle {
+        width: 52px;
+        height: 52px;
+        min-width: 52px;
+    }
+    
+    .btn-primary.btn-circle .icon {
+        font-size: 1.4rem;
+    }
+    
+    /* Reorganización de tarjetas delivery para móviles */
+    .item-card {
+        padding: 0.75rem;
+    }
+    
+    .item-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+    
+    .item-info {
+        order: 1;
+    }
+    
+    .item-controls {
+        order: 2;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .item-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
+    
+    .status-badge {
+        align-self: flex-start;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+    }
+    
+    /* Botones de acción más compactos en móvil */
+    .action-buttons {
+        display: flex;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+    }
+    
+    .action-buttons .btn-small {
+        font-size: 0.7rem;
+        padding: 0.3rem 0.5rem;
+        min-width: auto;
+    }
+    
+    /* Información de precios más compacta */
+    .item-pricing {
+        padding: 0.4rem;
+        margin: 0.4rem 0;
+        font-size: 0.8rem;
+    }
+    
+    .item-pricing p {
+        margin-bottom: 0.15rem;
+    }
+    
+    /* Descripción en móvil */
+    .item-description {
+        font-size: 0.8rem;
+        margin: 0.4rem 0;
     }
 }
 
@@ -1989,7 +2109,22 @@ body {
     font-size: 0.9rem;
 }
 
-/* Card de factura */
+/* Facturas Summary Grid */
+.facturas-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .facturas-summary {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+}
+
+/* Card de factura - Layout Vertical */
 .factura-card {
     background: white;
     border-radius: 0.5rem;
@@ -1997,6 +2132,60 @@ body {
     margin-bottom: 0.75rem;
     border: 1px solid #e5e7eb;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.factura-card .factura-info {
+    margin-bottom: 0.75rem;
+}
+
+.factura-card .factura-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+}
+
+.factura-card .factura-meta {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.factura-card .factura-total {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #059669;
+    text-align: center;
+    padding: 0.5rem;
+    background: #f0fdf4;
+    border-radius: 0.375rem;
+    margin-bottom: 0.75rem;
+}
+
+.factura-card .factura-cliente {
+    font-size: 0.875rem;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+
+.factura-card .factura-productos {
+    margin-bottom: 0.75rem;
+    flex: 1;
+}
+
+.factura-card .producto-line {
+    font-size: 0.8rem;
+    color: #6b7280;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.factura-card .producto-line:last-child {
+    border-bottom: none;
 }
 
 .factura-card.anulada {
@@ -2004,51 +2193,53 @@ body {
     border-color: #fecaca;
 }
 
-.factura-header {
+.factura-fecha {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.factura-actions {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.75rem;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: auto;
 }
 
-.factura-numero {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #1f2937;
+.factura-actions .btn-action {
+    flex: 1;
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
 }
 
-.factura-tipo {
+.factura-actions .btn-action:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+}
+
+/* Badges de tipo de factura */
+.badge.fiscal {
+    background: #dbeafe;
+    color: #1d4ed8;
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
     font-weight: 500;
 }
 
-.factura-tipo.FACTURA {
-    background: #dbeafe;
-    color: #1d4ed8;
-}
-
-.factura-tipo.BOLETA {
+.badge.no-fiscal {
     background: #f3f4f6;
     color: #374151;
-}
-
-.factura-cliente {
-    font-size: 0.875rem;
-    color: #374151;
-    margin-bottom: 0.25rem;
-}
-
-.factura-fecha {
     font-size: 0.75rem;
-    color: #6b7280;
-}
-
-.factura-total {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #059669;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
 }
 
 .factura-rnc {
@@ -2147,6 +2338,11 @@ body {
     font-weight: 600;
 }
 
+/* Ocultar labels en desktop */
+.form-group-mobile-label {
+    display: none;
+}
+
 /* Totales de factura */
 .totales-section {
     background: #f9fafb;
@@ -2240,9 +2436,77 @@ body {
 
 /* Responsive para formularios de productos */
 @media (max-width: 768px) {
+    /* Reorganización vertical de productos en facturas */
+    .producto-item {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 1rem;
+        gap: 0.75rem;
+        background: #ffffff;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
     .form-row {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        width: 100%;
+    }
+    
+    /* Labels para campos de producto en móvil */
+    .form-group-mobile-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Hacer inputs más grandes para móvil */
+    .producto-item input {
+        padding: 0.75rem;
+        font-size: 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    /* Estilo especial para el total */
+    .producto-total {
+        background: #f3f4f6 !important;
+        color: #374151 !important;
+        font-weight: 600 !important;
+        font-size: 1.1rem !important;
+        border: 2px solid #d1d5db !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Botón de remover más visible en móvil */
+    .btn-remove-producto {
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+        font-size: 1.2rem;
+        cursor: pointer;
+        margin-top: 0.5rem;
+        width: 100%;
+        transition: all 0.2s;
+    }
+    
+    .btn-remove-producto:hover {
+        background: #dc2626;
     }
     
     .facturas-filters {
@@ -2640,6 +2904,52 @@ body {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.5rem;
+    justify-content: center;
+}
+
+.conduce-actions .btn-action {
+    flex: 1;
+    max-width: 80px;
+    min-height: 36px;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.conduce-actions .btn-action:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.conduce-actions .btn-action:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.conduce-actions .btn-action.danger {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+.conduce-actions .btn-action.danger:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+    color: #b91c1c;
 }
 
 /* Responsive para créditos */
@@ -2659,7 +2969,15 @@ body {
     }
     
     .conduce-actions {
-        flex-direction: column;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .conduce-actions .btn-action {
+        flex: 0 1 auto;
+        min-width: 70px;
+        font-size: 0.7rem;
+        padding: 0.4rem 0.6rem;
     }
 }
 

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico - Comedor & Delivery</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #3b82f6;
+            text-align: center;
+        }
+        .status {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .log-entry.error { background: #7f1d1d; color: #fca5a5; }
+        .log-entry.success { background: #065f46; color: #6ee7b7; }
+        .log-entry.warning { background: #92400e; color: #fcd34d; }
+        .log-entry.info { background: #1e3a8a; color: #93c5fd; }
+        .log-entry.debug { background: #374151; color: #d1d5db; }
+        
+        .progress {
+            background: #374151;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Diagnóstico de Carga de Módulos</h1>
+        
+        <div class="status">
+            <h3>📊 Progreso de Carga</h3>
+            <div class="progress">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p id="progress-text">Iniciando diagnóstico...</p>
+        </div>
+        
+        <div class="status">
+            <h3>📋 Log de Eventos</h3>
+            <div id="log-container"></div>
+        </div>
+        
+        <div class="status">
+            <h3>🧩 Estado de Módulos</h3>
+            <div id="modules-status"></div>
+        </div>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('log-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const modulesStatus = document.getElementById('modules-status');
+        
+        let logCount = 0;
+        const maxLogs = 100;
+        
+        // Función para agregar log
+        function addLog(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+            
+            logCount++;
+            if (logCount > maxLogs) {
+                logContainer.removeChild(logContainer.lastChild);
+                logCount--;
+            }
+        }
+        
+        // Interceptar console
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('[DEBUG]')) {
+                addLog(message.replace('[DEBUG]', ''), 'debug');
+            } else {
+                addLog(message, 'info');
+            }
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            addLog('ERROR: ' + args.join(' '), 'error');
+            originalError.apply(console, args);
+        };
+        
+        console.warn = function(...args) {
+            addLog('WARN: ' + args.join(' '), 'warning');
+            originalWarn.apply(console, args);
+        };
+        
+        // Actualizar progreso
+        function updateProgress(percent, text) {
+            progressBar.style.width = percent + '%';
+            progressText.textContent = text;
+        }
+        
+        // Actualizar estado de módulos
+        function updateModulesStatus() {
+            const modules = {
+                StateModule: window.StateModule,
+                APIModule: window.APIModule,
+                UIModule: window.UIModule,
+                WebSocketModule: window.WebSocketModule,
+                VentasModule: window.VentasModule,
+                OrdenesModule: window.OrdenesModule,
+                GastosModule: window.GastosModule,
+                ClientesModule: window.ClientesModule,
+                FacturasModule: window.FacturasModule,
+                CreditosModule: window.CreditosModule,
+                ConfiguracionModule: window.ConfiguracionModule,
+                ModalesModule: window.ModalesModule
+            };
+            
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+            
+            Object.entries(modules).forEach(([name, module]) => {
+                const status = module ? 'CARGADO' : 'PENDIENTE';
+                const color = module ? '#10b981' : '#ef4444';
+                
+                html += `
+                    <div style="background: #374151; padding: 10px; border-radius: 5px; border-left: 4px solid ${color};">
+                        <strong>${name}</strong><br>
+                        <small style="color: ${color};">${status}</small>
+                        ${module && name === 'UIModule' ? 
+                            `<br><small>setupEventListeners: ${typeof module.setupEventListeners === 'function' ? 'OK' : 'MISSING'}</small>` 
+                            : ''
+                        }
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            modulesStatus.innerHTML = html;
+        }
+        
+        // Actualizar estado cada 500ms
+        const statusInterval = setInterval(updateModulesStatus, 500);
+        
+        // Manejo de errores globales
+        window.addEventListener('error', (event) => {
+            addLog(`ERROR GLOBAL: ${event.message} en ${event.filename}:${event.lineno}`, 'error');
+        });
+        
+        window.addEventListener('unhandledrejection', (event) => {
+            addLog(`PROMESA RECHAZADA: ${event.reason}`, 'error');
+        });
+        
+        // Cargar script de diagnóstico
+        addLog('Iniciando carga del script de diagnóstico...', 'info');
+        updateProgress(10, 'Cargando script de diagnóstico...');
+        
+        const script = document.createElement('script');
+        script.src = './diagnostic.js';
+        script.onload = () => {
+            addLog('Script de diagnóstico cargado', 'success');
+            updateProgress(20, 'Script de diagnóstico cargado');
+        };
+        script.onerror = (error) => {
+            addLog('Error cargando script de diagnóstico: ' + error, 'error');
+            updateProgress(0, 'Error cargando script');
+        };
+        document.head.appendChild(script);
+        
+        // Simular progreso mientras se cargan los módulos
+        let currentProgress = 20;
+        const progressInterval = setInterval(() => {
+            if (currentProgress < 90) {
+                currentProgress += 5;
+                updateProgress(currentProgress, `Cargando módulos... ${currentProgress}%`);
+            }
+        }, 200);
+        
+        // Verificar finalización
+        setTimeout(() => {
+            clearInterval(progressInterval);
+            clearInterval(statusInterval);
+            
+            if (window.UIModule && typeof window.UIModule.setupEventListeners === 'function') {
+                updateProgress(100, '✅ Diagnóstico completado exitosamente');
+                addLog('ÉXITO: Todos los módulos cargados correctamente', 'success');
+            } else {
+                updateProgress(100, '❌ Diagnóstico completado con errores');
+                addLog('ERROR: Algunos módulos no se cargaron correctamente', 'error');
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

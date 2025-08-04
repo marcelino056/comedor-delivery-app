@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comedor & Delivery - Carga Robusta</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/style.css">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Comedor & Delivery">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="empresa-info">
+                    <div class="empresa-logo-container">
+                        <img id="empresa-logo-header" src="" alt="Logo" class="empresa-logo hidden">
+                    </div>
+                    <div class="empresa-detalles">
+                        <h1 id="empresa-nombre-header">Comedor & Delivery</h1>
+                        <div class="empresa-meta">
+                            <span id="empresa-rnc-header" class="empresa-rnc hidden"></span>
+                            <span id="empresa-telefono-header" class="empresa-telefono hidden"></span>
+                            <span id="empresa-direccion-header" class="empresa-direccion hidden"></span>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-config" onclick="abrirConfiguracion()" title="Configuración de la Empresa">
+                    ⚙️
+                </button>
+            </div>
+            <div class="fecha-container">
+                <p id="fecha-actual"></p>
+                <div class="fecha-controls">
+                    <button class="btn-fecha" onclick="cambiarFecha(-1)" title="Día anterior">◀</button>
+                    <input type="date" id="fecha-selector" onchange="cambiarFechaSeleccionada()" />
+                    <button class="btn-fecha" onclick="cambiarFecha(1)" title="Día siguiente">▶</button>
+                    <button class="btn-fecha btn-hoy" onclick="irAHoy()" title="Ir a hoy">HOY</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="ventas">
+                <span class="icon">🛒</span>
+                <span class="label">Ventas</span>
+            </button>
+            <button class="tab-btn" data-tab="ordenes">
+                <span class="icon">🚚</span>
+                <span class="label">Delivery</span>
+            </button>
+            <button class="tab-btn" data-tab="gastos">
+                <span class="icon">💰</span>
+                <span class="label">Caja</span>
+            </button>
+            <button class="tab-btn" data-tab="clientes">
+                <span class="icon">👥</span>
+                <span class="label">Clientes</span>
+            </button>
+            <button class="tab-btn" data-tab="facturas">
+                <span class="icon">📄</span>
+                <span class="label">Facturas</span>
+            </button>
+            <button class="tab-btn" data-tab="creditos">
+                <span class="icon">📋</span>
+                <span class="label">Créditos</span>
+            </button>
+        </nav>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading hidden">
+            <div class="loading-spinner"></div>
+            <p>Cargando...</p>
+        </div>
+
+        <!-- Content Tabs -->
+        <main class="main-content">
+            <!-- Ventas Tab -->
+            <section id="ventas-tab" class="tab-content active">
+                <div class="content-header">
+                    <h2>Ventas del Día</h2>
+                    <button class="btn-primary" onclick="openModal('venta')">
+                        <span class="icon">➕</span>
+                        Nueva Venta
+                    </button>
+                </div>
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-ventas">$0</div>
+                        <div class="stat-label">Total Ventas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="cantidad-ventas">0</div>
+                        <div class="stat-label">Cantidad</div>
+                    </div>
+                </div>
+                <div id="ventas-list" class="content-list"></div>
+            </section>
+
+            <!-- Delivery Tab -->
+            <section id="ordenes-tab" class="tab-content">
+                <div class="content-header">
+                    <h2>Órdenes de Delivery</h2>
+                    <button class="btn-primary" onclick="openModal('orden')">
+                        <span class="icon">➕</span>
+                        Nueva Orden
+                    </button>
+                </div>
+                <div class="filters">
+                    <button class="filter-btn active" data-filter="todas">Todas</button>
+                    <button class="filter-btn" data-filter="pendiente">Pendientes</button>
+                    <button class="filter-btn" data-filter="en-camino">En Camino</button>
+                    <button class="filter-btn" data-filter="entregado">Entregadas</button>
+                </div>
+                <div id="ordenes-list" class="content-list"></div>
+            </section>
+
+            <!-- Caja Tab -->
+            <section id="gastos-tab" class="tab-content">
+                <div class="content-header">
+                    <h2>Control de Caja</h2>
+                    <div class="header-actions">
+                        <button class="btn-secondary" onclick="openModal('montoInicial')">
+                            💰 Monto Inicial
+                        </button>
+                        <button class="btn-primary" onclick="openModal('gasto')">
+                            <span class="icon">➕</span>
+                            Nuevo Gasto
+                        </button>
+                    </div>
+                </div>
+                <div id="caja-resumen" class="caja-summary"></div>
+                <div id="gastos-list" class="content-list"></div>
+            </section>
+
+            <!-- Clientes Tab -->
+            <section id="clientes-tab" class="tab-content">
+                <div class="content-header">
+                    <h2>Gestión de Clientes</h2>
+                    <button class="btn-primary" onclick="openModal('cliente')">
+                        <span class="icon">➕</span>
+                        Nuevo Cliente
+                    </button>
+                </div>
+                <div id="clientes-list" class="content-list"></div>
+            </section>
+
+            <!-- Facturas Tab -->
+            <section id="facturas-tab" class="tab-content">
+                <div class="content-header">
+                    <h2>Facturas</h2>
+                    <button class="btn-primary" onclick="openModal('factura')">
+                        <span class="icon">➕</span>
+                        Nueva Factura
+                    </button>
+                </div>
+                <div id="facturas-list" class="content-list"></div>
+            </section>
+
+            <!-- Créditos Tab -->
+            <section id="creditos-tab" class="tab-content">
+                <div class="content-header">
+                    <h2>Sistema de Créditos</h2>
+                    <div class="header-actions">
+                        <button class="btn-secondary" onclick="openModal('conduce')">
+                            📋 Nuevo Conduce
+                        </button>
+                        <button class="btn-primary" onclick="openModal('pagar-creditos')">
+                            💳 Pagar Créditos
+                        </button>
+                    </div>
+                </div>
+                <div class="creditos-summary">
+                    <div class="summary-card">
+                        <div class="summary-value" id="creditos-pendientes-total">$0</div>
+                        <div class="summary-label" id="creditos-pendientes-count">0 conduces pendientes</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="creditos-pagados-hoy">$0</div>
+                        <div class="summary-label" id="creditos-pagados-count">0 pagos hoy</div>
+                    </div>
+                </div>
+                <div class="creditos-filters">
+                    <select id="filtro-estado-credito" onchange="filtrarCreditos()">
+                        <option value="">Todos los estados</option>
+                        <option value="pendiente">Pendientes</option>
+                        <option value="pagado">Pagados</option>
+                        <option value="anulado">Anulados</option>
+                    </select>
+                    <select id="filtro-cliente-credito" onchange="filtrarCreditos()">
+                        <option value="">Todos los clientes</option>
+                    </select>
+                </div>
+                <div id="conduces-list" class="content-list"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Modal</h3>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates -->
+    <template id="template-cliente-modal">
+        <form onsubmit="submitCliente(event)">
+            <div class="form-group">
+                <label>Nombre del Cliente</label>
+                <input type="text" id="cliente-nombre" required placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+                <label>Teléfono</label>
+                <input type="tel" id="cliente-telefono" required placeholder="Número de teléfono">
+            </div>
+            <div class="form-group">
+                <label>Dirección</label>
+                <input type="text" id="cliente-direccion" placeholder="Dirección (opcional)">
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="cliente-credito">
+                    <span class="checkmark"></span>
+                    Habilitar crédito
+                </label>
+            </div>
+            <div class="form-group" id="limite-credito-group" style="display: none;">
+                <label>Límite de Crédito</label>
+                <input type="number" id="cliente-limite" min="0" step="1000" placeholder="Límite máximo de crédito">
+            </div>
+            <button type="submit" class="btn-submit">Guardar Cliente</button>
+        </form>
+    </template>
+
+    <!-- Cargar el sistema robusto -->
+    <script src="/robust-loader.js"></script>
+</body>
+</html>
