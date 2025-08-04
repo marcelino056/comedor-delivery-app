@@ -2952,6 +2952,55 @@ body {
     color: #b91c1c;
 }
 
+/* Estilos para validación fiscal en pago de créditos */
+.fiscal-warning {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    color: #92400e;
+    font-size: 0.875rem;
+}
+
+.warning-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.conduce-item.mixed-error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 0.375rem;
+}
+
+.conduce-fiscal-badge {
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.conduce-simple-badge {
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.conduce-meta-pago {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    margin: 0.25rem 0;
+}
+
 /* Responsive para créditos */
 @media (max-width: 768px) {
     .creditos-filters {

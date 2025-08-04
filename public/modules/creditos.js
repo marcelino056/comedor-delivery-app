@@ -677,20 +677,47 @@ async function cargarConducesPorCliente(clienteId) {
     }
 }
 
+// Cargar conduces pendientes para pago (llamada desde HTML)
+async function cargarConducesPendientes() {
+    const clienteId = document.getElementById('pago-cliente').value;
+    const conducesContainer = document.getElementById('conduces-pendientes');
+    
+    if (!clienteId) {
+        if (conducesContainer) {
+            conducesContainer.classList.add('hidden');
+        }
+        // Resetear contadores
+        const countElement = document.getElementById('conduces-seleccionados-count');
+        const totalElement = document.getElementById('total-pagar');
+        if (countElement) countElement.textContent = '0';
+        if (totalElement) totalElement.textContent = window.APIModule.formatCurrency(0);
+        return;
+    }
+    
+    await cargarConducesPorCliente(clienteId);
+}
+
 // Crear item de conduce con checkbox
 function createConduceCheckboxItem(conduce) {
     const fecha = new Date(conduce.fechaCreacion).toLocaleDateString('es-CO');
+    const esFiscal = conduce.esComprobanteFiscal || false;
     
     return `
-        <div class="conduce-item">
+        <div class="conduce-item" data-es-fiscal="${esFiscal}">
             <label class="conduce-checkbox-label">
-                <input type="checkbox" id="conduce-${conduce._id}" onchange="actualizarSeleccionConduces()">
+                <input type="checkbox" id="conduce-${conduce._id}">
                 <div class="conduce-info-pago">
                     <div class="conduce-header-pago">
                         <span class="conduce-numero">Conduce #${conduce.numero}</span>
                         <span class="conduce-total">${window.APIModule.formatCurrency(conduce.total)}</span>
                     </div>
-                    <div class="conduce-fecha">Fecha: ${fecha}</div>
+                    <div class="conduce-meta-pago">
+                        <span class="conduce-fecha">📅 ${fecha}</span>
+                        ${esFiscal ? 
+                            '<span class="conduce-fiscal-badge">📄 FISCAL</span>' : 
+                            '<span class="conduce-simple-badge">🧾 SIMPLE</span>'
+                        }
+                    </div>
                     <div class="conduce-productos-resumen">
                         ${conduce.productos.map(p => `${p.cantidad}x ${p.descripcion}`).join(', ')}
                     </div>
@@ -704,8 +731,78 @@ function createConduceCheckboxItem(conduce) {
 function setupConduceCheckboxListeners() {
     const checkboxes = document.querySelectorAll('#conduces-list-pago input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', actualizarSeleccionConduces);
+        checkbox.addEventListener('change', () => {
+            validateFiscalMix();
+            actualizarSeleccionConduces();
+        });
     });
+}
+
+// Validar que no se mezclen conduces fiscales y simples
+function validateFiscalMix() {
+    const checkboxes = document.querySelectorAll('#conduces-list-pago input[type="checkbox"]:checked');
+    const conducesFiscales = [];
+    const conducesSimples = [];
+    
+    checkboxes.forEach(checkbox => {
+        const conduceItem = checkbox.closest('.conduce-item');
+        const esFiscal = conduceItem.dataset.esFiscal === 'true';
+        
+        if (esFiscal) {
+            conducesFiscales.push(checkbox);
+        } else {
+            conducesSimples.push(checkbox);
+        }
+    });
+    
+    const hayMezcla = conducesFiscales.length > 0 && conducesSimples.length > 0;
+    const btnPagar = document.getElementById('btn-pagar-creditos');
+    const warningDiv = document.getElementById('fiscal-mix-warning') || createFiscalWarning();
+    
+    if (hayMezcla) {
+        // Mostrar advertencia y deshabilitar botón
+        warningDiv.style.display = 'block';
+        warningDiv.innerHTML = `
+            <div class="warning-content">
+                ⚠️ <strong>Atención:</strong> No se pueden mezclar conduces fiscales y simples en la misma factura.
+                <br>
+                <small>Selecciona solo conduces del mismo tipo para continuar.</small>
+            </div>
+        `;
+        if (btnPagar) btnPagar.disabled = true;
+        
+        // Agregar clase de error a los checkboxes mezclados
+        checkboxes.forEach(cb => {
+            cb.closest('.conduce-item').classList.add('mixed-error');
+        });
+    } else {
+        // Ocultar advertencia y permitir continuar
+        warningDiv.style.display = 'none';
+        
+        // Remover clase de error
+        document.querySelectorAll('.conduce-item').forEach(item => {
+            item.classList.remove('mixed-error');
+        });
+        
+        // El botón se habilitará/deshabilitará en actualizarSeleccionConduces
+    }
+    
+    return !hayMezcla;
+}
+
+// Crear elemento de advertencia fiscal
+function createFiscalWarning() {
+    const warningDiv = document.createElement('div');
+    warningDiv.id = 'fiscal-mix-warning';
+    warningDiv.className = 'fiscal-warning';
+    warningDiv.style.display = 'none';
+    
+    const conducesList = document.getElementById('conduces-list-pago');
+    if (conducesList && conducesList.parentNode) {
+        conducesList.parentNode.insertBefore(warningDiv, conducesList.nextSibling);
+    }
+    
+    return warningDiv;
 }
 
 // Actualizar selección de conduces
@@ -726,12 +823,17 @@ function actualizarSeleccionConduces() {
     
     if (countElement) countElement.textContent = count;
     if (totalElement) totalElement.textContent = window.APIModule.formatCurrency(total);
-    if (btnElement) btnElement.disabled = count === 0;
+    
+    // Solo habilitar el botón si hay conduces seleccionados Y no hay mezcla fiscal
+    const isValidSelection = count > 0 && validateFiscalMix();
+    if (btnElement) btnElement.disabled = !isValidSelection;
 }
 
 // Procesar pago de créditos
 async function pagarCreditos(event) {
     event.preventDefault();
+    console.log('🔄 Iniciando proceso de pago de créditos...');
+    
     const btn = document.getElementById('btn-pagar-creditos');
     if (btn) btn.disabled = true;
     
@@ -742,7 +844,19 @@ async function pagarCreditos(event) {
         const metodoPago = document.getElementById('metodo-pago-conduce')?.value || 'efectivo';
         const conducesIds = Array.from(checkboxes).map(cb => cb.id.replace('conduce-', ''));
         
-        console.log('Datos del pago:', { clienteId, conducesIds, generarFacturaRNC, metodoPago });
+        console.log('📋 Datos del pago:', { 
+            clienteId, 
+            conducesIds, 
+            generarFacturaRNC, 
+            metodoPago,
+            checkboxesCount: checkboxes.length 
+        });
+        
+        if (!clienteId) {
+            window.notify.error('Debe seleccionar un cliente');
+            if (btn) btn.disabled = false;
+            return;
+        }
         
         if (conducesIds.length === 0) {
             window.notify.error('Debe seleccionar al menos un conduce');
@@ -750,6 +864,14 @@ async function pagarCreditos(event) {
             return;
         }
         
+        // Validar que no se mezclen tipos fiscales
+        if (!validateFiscalMix()) {
+            window.notify.error('No se pueden mezclar conduces fiscales y simples en la misma factura');
+            if (btn) btn.disabled = false;
+            return;
+        }
+        
+        console.log('⏳ Enviando solicitud de pago al servidor...');
         window.APIModule.showLoading(true);
         
         // Crear factura agrupando los conduces
@@ -763,7 +885,7 @@ async function pagarCreditos(event) {
             fechaEmision: window.StateModule.state.fechaSeleccionada
         };
         
-        console.log('Enviando datos al servidor:', facturaData);
+        console.log('📤 Enviando datos al servidor:', facturaData);
         
         const response = await fetch(`${window.APIModule.API_BASE}/facturas`, {
             method: 'POST',
@@ -839,6 +961,8 @@ window.CreditosModule = {
     guardarConduce,
     setupPagarCreditosModal,
     cargarConducesPorCliente,
+    cargarConducesPendientes,
+    validateFiscalMix,
     actualizarSeleccionConduces,
     pagarCreditos
 };
@@ -852,6 +976,8 @@ window.anularConduce = anularConduce;
 window.setupConduceModal = setupConduceModal;
 window.setupPagarCreditosModal = setupPagarCreditosModal;
 window.cargarConducesPorCliente = cargarConducesPorCliente;
+window.cargarConducesPendientes = cargarConducesPendientes;
+window.validateFiscalMix = validateFiscalMix;
 window.actualizarSeleccionConduces = actualizarSeleccionConduces;
 window.pagarCreditos = pagarCreditos;
 window.agregarProductoConduce = agregarProductoConduce;

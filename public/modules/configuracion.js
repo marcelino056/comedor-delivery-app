@@ -482,7 +482,7 @@ async function generarReporteRNC() {
             params.set('configuracion', configuracionId);
         }
 
-        const response = await fetch(`${window.APIModule.API_BASE}/reportes/rnc?${params.toString()}`);
+        const response = await fetch(`${window.APIModule.API_BASE}/facturas/reporte-rnc?${params.toString()}`);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));

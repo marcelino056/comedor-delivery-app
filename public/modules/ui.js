@@ -73,18 +73,28 @@ function updateCajaView() {
     const fecha = window.StateModule.state.fechaSeleccionada;
     const ventas = window.StateModule.state.ventas.filter(v => !v.anulada);
     const ordenes = window.StateModule.state.ordenes.filter(o => !o.anulada);
+    const facturas = (window.StateModule.state.facturas || []).filter(f => !f.anulada);
     const gastos = window.StateModule.state.gastos;
     const montoInicial = window.StateModule.state.montoInicial[fecha] || 0;
 
-    // Calcular totales por método de pago
+    // Calcular totales por método de pago incluyendo facturas
     const totalesPorMetodo = {};
     
-    [...ventas, ...ordenes].forEach(item => {
+    [...ventas, ...ordenes, ...facturas].forEach(item => {
         const metodo = item.metodoPago || 'efectivo';
         if (!totalesPorMetodo[metodo]) {
             totalesPorMetodo[metodo] = 0;
         }
-        totalesPorMetodo[metodo] += item.monto || item.total || 0;
+        // Para facturas usar total (subtotal + ITBIS), para otros usar monto o total
+        let amount = 0;
+        if (item.subtotal !== undefined) {
+            // Es una factura - usar total completo (subtotal + ITBIS)
+            amount = item.total || (item.subtotal + (item.itbis || 0));
+        } else {
+            // Es venta u orden - usar monto o total
+            amount = item.monto || item.total || 0;
+        }
+        totalesPorMetodo[metodo] += amount;
     });
 
     const totalIngresos = Object.values(totalesPorMetodo).reduce((sum, val) => sum + val, 0);
@@ -118,7 +128,7 @@ function updateCajaView() {
     updateElement('transferencia-total', totalesPorMetodo.transferencia || 0);
     
     // Actualizar contadores y detalles adicionales
-    const totalTransacciones = ventas.length + ordenes.length;
+    const totalTransacciones = ventas.length + ordenes.length + facturas.length;
     const transaccionesElement = document.getElementById('transacciones-total');
     if (transaccionesElement) {
         transaccionesElement.textContent = `${totalTransacciones} transacciones`;

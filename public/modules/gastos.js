@@ -143,7 +143,7 @@ function calcularTotalesDia() {
 
     const totalVentasLocal = ventasFecha.reduce((sum, venta) => sum + venta.monto, 0);
     const totalVentasDelivery = ordenesFecha.reduce((sum, orden) => sum + orden.total, 0);
-    const totalFacturas = facturasFecha.reduce((sum, factura) => sum + factura.subtotal, 0);
+    const totalFacturas = facturasFecha.reduce((sum, factura) => sum + (factura.total || (factura.subtotal + (factura.itbis || 0))), 0);
     const totalCreditosCreados = conducesFecha.reduce((sum, conduce) => sum + conduce.total, 0);
     const totalVentas = totalVentasLocal + totalVentasDelivery + totalFacturas;
     const totalGastos = gastosFecha.reduce((sum, gasto) => sum + gasto.monto, 0);
@@ -167,7 +167,7 @@ function calcularTotalesDia() {
         .reduce((sum, item) => sum + item.total, 0) +
         facturasFecha
         .filter(item => item.metodoPago === 'efectivo')
-        .reduce((sum, item) => sum + item.subtotal, 0);
+        .reduce((sum, item) => sum + (item.total || (item.subtotal + (item.itbis || 0))), 0);
     
     const ventasTarjeta = ventasFecha
         .filter(item => item.metodoPago === 'tarjeta')
@@ -177,7 +177,7 @@ function calcularTotalesDia() {
         .reduce((sum, item) => sum + item.total, 0) +
         facturasFecha
         .filter(item => item.metodoPago === 'tarjeta')
-        .reduce((sum, item) => sum + item.subtotal, 0);
+        .reduce((sum, item) => sum + (item.total || (item.subtotal + (item.itbis || 0))), 0);
     
     const ventasTransferencia = ventasFecha
         .filter(item => item.metodoPago === 'transferencia')
@@ -187,7 +187,7 @@ function calcularTotalesDia() {
         .reduce((sum, item) => sum + item.total, 0) +
         facturasFecha
         .filter(item => item.metodoPago === 'transferencia')
-        .reduce((sum, item) => sum + item.subtotal, 0);
+        .reduce((sum, item) => sum + (item.total || (item.subtotal + (item.itbis || 0))), 0);
     
     // Monto inicial del día seleccionado
     const montoInicial = window.StateModule.state.montoInicial[window.StateModule.state.fechaSeleccionada] || 0;
@@ -220,7 +220,7 @@ async function generarReporteDiario() {
     try {
         window.APIModule.showLoading(true);
         
-        const response = await fetch(`${window.APIModule.API_BASE}/reportes/diario/${fecha}`);
+        const response = await fetch(`${window.APIModule.API_BASE}/reporte/diario/${fecha}`);
         
         if (!response.ok) {
             throw new Error('Error al generar reporte');
