@@ -2969,6 +2969,63 @@ body {
     gap: 0.5rem;
 }
 
+/* Mejoras para tarjetas de conduce */
+.conduce-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.conduce-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.conduce-tipo-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.conduce-tipo-badge.fiscal {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border: 1px solid #93c5fd;
+}
+
+.conduce-tipo-badge.simple {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.conduce-desglose-fiscal {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+}
+
+.conduce-desglose-fiscal div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+.conduce-desglose-fiscal div:last-child {
+    margin-bottom: 0;
+    padding-top: 0.25rem;
+    border-top: 1px solid #e2e8f0;
+    font-weight: 600;
+}
+
 .conduce-item.mixed-error {
     background: #fef2f2;
     border: 1px solid #fca5a5;

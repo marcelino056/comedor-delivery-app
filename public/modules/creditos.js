@@ -89,16 +89,35 @@ function renderConducesList(conduces) {
 function createConduceCard(conduce) {
     const fecha = new Date(conduce.fechaCreacion);
     const fechaStr = fecha.toLocaleDateString('es-CO');
+    const esFiscal = conduce.esComprobanteFiscal || false;
+    
+    // Calcular desglose fiscal si es necesario
+    let desgloseFiscal = '';
+    if (esFiscal && conduce.subtotal && conduce.itbis) {
+        desgloseFiscal = `
+            <div class="conduce-desglose-fiscal">
+                <div><strong>Subtotal:</strong> ${window.APIModule.formatCurrency(conduce.subtotal)}</div>
+                <div><strong>ITBIS (18%):</strong> ${window.APIModule.formatCurrency(conduce.itbis)}</div>
+            </div>
+        `;
+    }
     
     return `
         <div class="conduce-card">
             <div class="conduce-header">
                 <h4>Conduce #${conduce.numero}</h4>
-                <span class="conduce-estado ${conduce.estado}">${conduce.estado.toUpperCase()}</span>
+                <div class="conduce-badges">
+                    <span class="conduce-estado ${conduce.estado}">${conduce.estado.toUpperCase()}</span>
+                    ${esFiscal ? 
+                        '<span class="conduce-tipo-badge fiscal">📄 FISCAL</span>' : 
+                        '<span class="conduce-tipo-badge simple">🧾 SIMPLE</span>'
+                    }
+                </div>
             </div>
             <div class="conduce-info">
                 <div><strong>Cliente:</strong> ${conduce.cliente?.nombre || 'Cliente no encontrado'}</div>
                 <div><strong>Fecha:</strong> ${fechaStr}</div>
+                ${desgloseFiscal}
                 <div><strong>Total:</strong> ${window.APIModule.formatCurrency(conduce.total)}</div>
                 <div><strong>Productos:</strong> ${conduce.productos?.length || 0} items</div>
             </div>
