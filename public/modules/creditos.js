@@ -552,8 +552,12 @@ function calcularTotalConduce() {
     });
     
     // Verificar si es comprobante fiscal
-    const esComprobanteFiscal = document.getElementById('conduce-comprobante-fiscal')?.checked || false;
+    const checkboxElement = document.getElementById('conduce-comprobante-fiscal');
+    const esComprobanteFiscal = checkboxElement?.checked || false;
     
+    console.log('🔍 Elemento checkbox:', checkboxElement);
+    console.log('🔍 Checkbox existe:', !!checkboxElement);
+    console.log('🔍 Checkbox.checked:', checkboxElement?.checked);
     console.log('🔍 Estado del checkbox fiscal:', esComprobanteFiscal);
     
     // Calcular ITBIS solo si es comprobante fiscal
@@ -586,6 +590,34 @@ function calcularTotalConduce() {
     updateElementSafe('conduce-total', totalFinal);
 }
 
+// Función de debugging para verificar el estado del checkbox
+function debugCheckboxConduce() {
+    const checkbox = document.getElementById('conduce-comprobante-fiscal');
+    console.log('🐛 DEBUG CHECKBOX CONDUCE:');
+    console.log('  - Elemento existe:', !!checkbox);
+    console.log('  - Checked:', checkbox?.checked);
+    console.log('  - Value:', checkbox?.value);
+    console.log('  - Type:', checkbox?.type);
+    console.log('  - ID:', checkbox?.id);
+    return checkbox?.checked || false;
+}
+
+// Agregar listener para debuggear cambios del checkbox
+document.addEventListener('DOMContentLoaded', () => {
+    const checkbox = document.getElementById('conduce-comprobante-fiscal');
+    if (checkbox) {
+        checkbox.addEventListener('change', (event) => {
+            console.log('🔄 CHECKBOX CAMBIÓ:', event.target.checked);
+            debugCheckboxConduce();
+        });
+        
+        // También debuggear clics
+        checkbox.addEventListener('click', (event) => {
+            console.log('👆 CHECKBOX CLICK:', event.target.checked);
+        });
+    }
+});
+
 // Guardar conduce
 async function guardarConduce(event) {
     event.preventDefault();
@@ -599,7 +631,23 @@ async function guardarConduce(event) {
         }
         
         // Obtener estado del checkbox fiscal PRIMERO
-        const esComprobanteFiscal = document.getElementById('conduce-comprobante-fiscal')?.checked || false;
+        const checkboxElement = document.getElementById('conduce-comprobante-fiscal');
+        const esComprobanteFiscal = checkboxElement?.checked || false;
+        
+        console.log('📋 [GUARDAR] Elemento checkbox:', checkboxElement);
+        console.log('📋 [GUARDAR] Checkbox.checked:', checkboxElement?.checked);
+        console.log('📋 [GUARDAR] esComprobanteFiscal final:', esComprobanteFiscal);
+        
+        // Verificación adicional con debugCheckboxConduce
+        const debugResult = debugCheckboxConduce();
+        console.log('📋 [GUARDAR] Debug checkbox result:', debugResult);
+        
+        if (esComprobanteFiscal !== debugResult) {
+            console.warn('⚠️ INCONSISTENCIA EN CHECKBOX!', {
+                esComprobanteFiscal,
+                debugResult
+            });
+        }
         
         // Recopilar productos
         const productos = [];
