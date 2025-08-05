@@ -181,13 +181,34 @@ module.exports = {
       doc.text('Subtotal:', 360, yPosition);
       doc.text(`$${conduce.subtotal.toFixed(2)}`, 450, yPosition);
       yPosition += 20;
-      doc.text('ITBIS (18%):', 360, yPosition);
-      doc.text(`$${conduce.impuesto.toFixed(2)}`, 450, yPosition);
-      yPosition += 20;
-      doc.fontSize(14).text('TOTAL:', 360, yPosition);
-      doc.text(`$${conduce.total.toFixed(2)}`, 450, yPosition);
+      
+      // Mostrar ITBIS solo si es comprobante fiscal
+      if (conduce.esComprobanteFiscal) {
+        doc.text('ITBIS (18%):', 360, yPosition);
+        doc.text(`$${conduce.impuesto.toFixed(2)}`, 450, yPosition);
+        yPosition += 20;
+        doc.fontSize(14).text('TOTAL:', 360, yPosition);
+        doc.text(`$${conduce.total.toFixed(2)}`, 450, yPosition);
+      } else {
+        doc.text('ITBIS (18%):', 360, yPosition);
+        doc.text('N/A (No Fiscal)', 450, yPosition);
+        yPosition += 20;
+        doc.fontSize(14).text('TOTAL:', 360, yPosition);
+        doc.text(`$${conduce.subtotal.toFixed(2)}`, 450, yPosition);
+      }
+      
       yPosition += 40;
-      doc.fontSize(10).text('DOCUMENTO DE CRÉDITO - NO ES FACTURA FISCAL', 50, yPosition);
+      
+      // Información específica según el tipo de documento
+      if (conduce.esComprobanteFiscal) {
+        doc.fontSize(10).text('COMPROBANTE FISCAL - CONDUCE', 50, yPosition);
+        yPosition += 15;
+        doc.text(`Impuesto incluido: $${conduce.impuesto.toFixed(2)}`, 50, yPosition);
+      } else {
+        doc.fontSize(10).text('DOCUMENTO DE CRÉDITO - NO ES FACTURA FISCAL', 50, yPosition);
+        yPosition += 15;
+        doc.text('Sin impuestos aplicables', 50, yPosition);
+      }
       yPosition += 15;
       doc.text(`Fecha de vencimiento: ${conduce.fechaVencimiento ? conduce.fechaVencimiento.toLocaleDateString('es-DO') : ''}`, 50, yPosition);
       yPosition += 15;
