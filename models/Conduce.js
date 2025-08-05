@@ -18,6 +18,8 @@ const conduceSchema = new mongoose.Schema({
   total: Number,
   esComprobanteFiscal: { type: Boolean, default: false },
   estado: { type: String, default: 'pendiente' },
+  anulado: { type: Boolean, default: false },
+  motivoAnulacion: String,
   fechaCreacion: { type: Date, default: getLocalDate },
   fechaVencimiento: Date
 });
