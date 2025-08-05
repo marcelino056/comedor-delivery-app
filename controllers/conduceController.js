@@ -40,13 +40,28 @@ module.exports = {
         console.warn('[CONDUCES][WARN] Cliente sin crédito habilitado:', clienteId);
         return res.status(400).json({ error: 'Cliente no tiene crédito habilitado' });
       }
-      let subtotal = 0;
-      productos.forEach(producto => {
-        producto.total = producto.cantidad * producto.precioUnitario;
-        subtotal += producto.total;
-      });
-      const impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
-      const total = subtotal + impuesto;
+      // Usar los valores calculados del frontend si están disponibles
+      let subtotal = req.body.subtotal;
+      let impuesto = req.body.impuesto;
+      let total = req.body.total;
+      
+      // Solo recalcular si no vienen del frontend
+      if (subtotal === undefined || impuesto === undefined || total === undefined) {
+        subtotal = 0;
+        productos.forEach(producto => {
+          producto.total = producto.cantidad * producto.precioUnitario;
+          subtotal += producto.total;
+        });
+        impuesto = esComprobanteFiscal ? subtotal * 0.18 : 0;
+        total = subtotal + impuesto;
+      } else {
+        // Verificar que los productos tengan totales calculados
+        productos.forEach(producto => {
+          if (!producto.total) {
+            producto.total = producto.cantidad * producto.precioUnitario;
+          }
+        });
+      }
       const nuevoSaldo = cliente.saldoPendiente + total;
       if (nuevoSaldo > cliente.limiteCredito) {
         console.warn('[CONDUCES][WARN] Límite de crédito excedido para cliente:', clienteId);

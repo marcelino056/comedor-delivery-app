@@ -180,23 +180,20 @@ module.exports = {
               precioUnitario: producto.precioUnitario,
               total: producto.cantidad * producto.precioUnitario
             });
-            subtotal += producto.cantidad * producto.precioUnitario;
           });
+          
+          // Sumar los totales calculados de cada conduce (respetando su cálculo original)
+          subtotal += conduce.subtotal || 0;
+          impuesto += conduce.impuesto || 0;
+          total += conduce.total || 0;
         });
         
-        // Calcular total pagado de los conduces
-        const totalPagado = conduces.reduce((sum, conduce) => sum + conduce.total, 0);
-        total = totalPagado;
+        console.log(`[FACTURAS] Totales desde conduces - Subtotal: ${subtotal.toFixed(2)}, Impuesto: ${impuesto.toFixed(2)}, Total: ${total.toFixed(2)}`);
         
-        // Si los conduces son fiscales, el subtotal e impuesto ya están calculados
-        if (conducesEsFiscal) {
-          // Para conduces fiscales, calcular el subtotal sin impuestos
-          const subtotalSinImpuestos = totalPagado / 1.18;
-          impuesto = totalPagado - subtotalSinImpuestos;
-          
-          // Sobrescribir valores para la factura
-          subtotal = subtotalSinImpuestos;
-          console.log(`[FACTURAS] Conduces fiscales - Subtotal: ${subtotal.toFixed(2)}, Impuesto: ${impuesto.toFixed(2)}, Total: ${total.toFixed(2)}`);
+        // Verificar que los conduces tengan el tipo fiscal correcto
+        const esFiscalFactura = Boolean(conduces[0].esComprobanteFiscal);
+        if (esFiscalFactura !== esComprobanteFiscal) {
+          console.warn('[FACTURAS] Mismatch de tipo fiscal entre conduces y factura solicitada');
         }
         
         // Marcar conduces como pagados
