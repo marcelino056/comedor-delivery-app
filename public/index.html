@@ -914,6 +914,37 @@
         <div class="spinner"></div>
     </div>
 
+    <!-- Scripts -->
+    <script src="/version-checker.js"></script>
+    <script src="/sw-register.js"></script>
     <script src="/app.js"></script>
+    
+    <!-- Botón de actualización forzada (solo visible en desarrollo) -->
+    <button id="force-update-btn" onclick="window.forceAppUpdate()" 
+            style="
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                background: #dc2626;
+                color: white;
+                border: none;
+                padding: 10px 15px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                z-index: 9999;
+                display: none;
+            ">
+        🔄 Forzar Actualización
+    </button>
+    
+    <script>
+        // Mostrar botón de actualización en desarrollo/testing
+        if (window.location.hostname === 'localhost' || 
+            window.location.hostname === '127.0.0.1' ||
+            window.location.search.includes('debug=true')) {
+            document.getElementById('force-update-btn').style.display = 'block';
+        }
+    </script>
 </body>
 </html>
