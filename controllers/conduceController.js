@@ -30,11 +30,13 @@ module.exports = {
   async create(req, res) {
     try {
       console.log('[CONDUCES] Creando conduce:', req.body);
+      const { clienteId, productos, diasVencimiento, esComprobanteFiscal } = req.body;
+      
       console.log('[CONDUCES] Es comprobante fiscal:', esComprobanteFiscal);
       console.log('[CONDUCES] Subtotal frontend:', req.body.subtotal);
       console.log('[CONDUCES] Impuesto frontend:', req.body.impuesto);
       console.log('[CONDUCES] Total frontend:', req.body.total);
-      const { clienteId, productos, diasVencimiento, esComprobanteFiscal } = req.body;
+      
       const cliente = await Cliente.findById(clienteId);
       if (!cliente) {
         console.warn('[CONDUCES][WARN] Cliente no encontrado para conduce:', clienteId);
