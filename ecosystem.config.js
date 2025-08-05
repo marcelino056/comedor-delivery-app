@@ -11,7 +11,7 @@ module.exports = {
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: 3005
+      PORT: 3007
     },
     error_file: '/var/log/pm2/comedor-app-error.log',
     out_file: '/var/log/pm2/comedor-app-out.log',
