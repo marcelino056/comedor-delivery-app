@@ -441,10 +441,30 @@ async function setupConduceModal() {
         // Configurar event listener para comprobante fiscal
         const comprobanteFiscalCheckbox = document.getElementById('conduce-comprobante-fiscal');
         if (comprobanteFiscalCheckbox) {
-            comprobanteFiscalCheckbox.addEventListener('change', () => {
-                console.log('📋 Comprobante fiscal conduce cambió:', comprobanteFiscalCheckbox.checked);
+            console.log('🔧 Configurando event listeners para checkbox fiscal');
+            
+            // Definir funciones de event handlers
+            const handleCheckboxChange = (event) => {
+                console.log('📋 Comprobante fiscal conduce cambió:', event.target.checked);
+                debugCheckboxConduce();
                 calcularTotalConduce();
-            });
+            };
+            
+            const handleCheckboxClick = (event) => {
+                console.log('👆 CHECKBOX CLICK:', event.target.checked);
+            };
+            
+            // Limpiar event listeners previos (usando clonación para remover todos los listeners)
+            const newCheckbox = comprobanteFiscalCheckbox.cloneNode(true);
+            comprobanteFiscalCheckbox.parentNode.replaceChild(newCheckbox, comprobanteFiscalCheckbox);
+            
+            // Agregar event listeners al nuevo elemento
+            newCheckbox.addEventListener('change', handleCheckboxChange);
+            newCheckbox.addEventListener('click', handleCheckboxClick);
+            
+            console.log('✅ Event listeners configurados para checkbox fiscal');
+        } else {
+            console.error('❌ No se encontró el checkbox conduce-comprobante-fiscal');
         }
         
         // Inicializar cálculos
@@ -601,22 +621,6 @@ function debugCheckboxConduce() {
     console.log('  - ID:', checkbox?.id);
     return checkbox?.checked || false;
 }
-
-// Agregar listener para debuggear cambios del checkbox
-document.addEventListener('DOMContentLoaded', () => {
-    const checkbox = document.getElementById('conduce-comprobante-fiscal');
-    if (checkbox) {
-        checkbox.addEventListener('change', (event) => {
-            console.log('🔄 CHECKBOX CAMBIÓ:', event.target.checked);
-            debugCheckboxConduce();
-        });
-        
-        // También debuggear clics
-        checkbox.addEventListener('click', (event) => {
-            console.log('👆 CHECKBOX CLICK:', event.target.checked);
-        });
-    }
-});
 
 // Guardar conduce
 async function guardarConduce(event) {
