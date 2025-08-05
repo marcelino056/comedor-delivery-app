@@ -554,6 +554,8 @@ function calcularTotalConduce() {
     // Verificar si es comprobante fiscal
     const esComprobanteFiscal = document.getElementById('conduce-comprobante-fiscal')?.checked || false;
     
+    console.log('🔍 Estado del checkbox fiscal:', esComprobanteFiscal);
+    
     // Calcular ITBIS solo si es comprobante fiscal
     const itbis = esComprobanteFiscal ? subtotalBruto * 0.18 : 0;
     const totalFinal = subtotalBruto + itbis;
@@ -643,7 +645,8 @@ async function guardarConduce(event) {
             ...conduceData,
             subtotalCalculado: subtotalBruto,
             itbisCalculado: itbis,
-            totalCalculado: totalFinal
+            totalCalculado: totalFinal,
+            checkboxFiscal: esComprobanteFiscal
         });
         
         window.APIModule.showLoading(true);

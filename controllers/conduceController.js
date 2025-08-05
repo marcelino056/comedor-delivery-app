@@ -30,6 +30,10 @@ module.exports = {
   async create(req, res) {
     try {
       console.log('[CONDUCES] Creando conduce:', req.body);
+      console.log('[CONDUCES] Es comprobante fiscal:', esComprobanteFiscal);
+      console.log('[CONDUCES] Subtotal frontend:', req.body.subtotal);
+      console.log('[CONDUCES] Impuesto frontend:', req.body.impuesto);
+      console.log('[CONDUCES] Total frontend:', req.body.total);
       const { clienteId, productos, diasVencimiento, esComprobanteFiscal } = req.body;
       const cliente = await Cliente.findById(clienteId);
       if (!cliente) {
@@ -62,6 +66,9 @@ module.exports = {
           }
         });
       }
+      
+      console.log('[CONDUCES] Totales finales - Subtotal:', subtotal, 'Impuesto:', impuesto, 'Total:', total);
+      
       const nuevoSaldo = cliente.saldoPendiente + total;
       if (nuevoSaldo > cliente.limiteCredito) {
         console.warn('[CONDUCES][WARN] Límite de crédito excedido para cliente:', clienteId);
