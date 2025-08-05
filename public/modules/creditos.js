@@ -592,12 +592,14 @@ async function guardarConduce(event) {
     
     try {
         const clienteId = document.getElementById('conduce-cliente').value;
-        const esComprobanteFiscal = document.getElementById('conduce-comprobante-fiscal')?.checked || false;
         
         if (!clienteId) {
             window.notify.error('Debe seleccionar un cliente');
             return;
         }
+        
+        // Obtener estado del checkbox fiscal PRIMERO
+        const esComprobanteFiscal = document.getElementById('conduce-comprobante-fiscal')?.checked || false;
         
         // Recopilar productos
         const productos = [];
@@ -686,7 +688,22 @@ async function guardarConduce(event) {
         
     } catch (error) {
         console.error('❌ Error guardando conduce:', error);
-        window.notify.error(`Error al generar conduce: ${error.message}`);
+        window.APIModule.showLoading(false);
+        
+        // Manejo específico de errores
+        let errorMessage = 'Error desconocido al guardar el conduce';
+        
+        if (error.message) {
+            if (error.message.includes('duplicate key')) {
+                errorMessage = 'Ya existe un conduce con estos datos';
+            } else if (error.message.includes('esComprobanteFiscal')) {
+                errorMessage = 'Error en el cálculo de impuestos. Intente de nuevo.';
+            } else {
+                errorMessage = error.message;
+            }
+        }
+        
+        window.notify.error(`Error al generar conduce: ${errorMessage}`);
     } finally {
         window.APIModule.showLoading(false);
     }
