@@ -149,19 +149,18 @@ module.exports = {
       // Información del conduce
       doc.fontSize(16).text('CONDUCE', 400, 50);
       doc.fontSize(12).text(`No: ${conduce.numero}`, 400, 75);
-      doc.text(`Fecha: ${conduce.fechaEmision ? conduce.fechaEmision.toLocaleDateString('es-DO') : ''}`, 400, 90);
-      doc.text(`Vence: ${conduce.fechaVencimiento ? conduce.fechaVencimiento.toLocaleDateString('es-DO') : ''}`, 400, 105);
-      doc.text(`Estado: ${conduce.estado ? conduce.estado.toUpperCase() : ''}`, 400, 120);
-      doc.text('ENTREGAR A:', 50, 160);
-      doc.text(`Cliente: ${conduce.cliente.nombre}`, 50, 180);
-      doc.text(`Teléfono: ${conduce.cliente.telefono}`, 50, 195);
+      doc.text(`Fecha: ${conduce.fechaCreacion ? conduce.fechaCreacion.toLocaleDateString('es-DO') : ''}`, 400, 90);
+      doc.text(`Estado: ${conduce.estado ? conduce.estado.toUpperCase() : ''}`, 400, 105);
+      doc.text('ENTREGAR A:', 50, 140);
+      doc.text(`Cliente: ${conduce.cliente.nombre}`, 50, 160);
+      doc.text(`Teléfono: ${conduce.cliente.telefono}`, 50, 175);
       if (conduce.cliente.rnc) {
-        doc.text(`RNC: ${conduce.cliente.rnc}`, 50, 210);
+        doc.text(`RNC: ${conduce.cliente.rnc}`, 50, 190);
       }
       if (conduce.cliente.direccion) {
-        doc.text(`Dirección: ${conduce.cliente.direccion}`, 50, 225);
+        doc.text(`Dirección: ${conduce.cliente.direccion}`, 50, 205);
       }
-      let yPosition = 260;
+      let yPosition = 240;
       doc.text('DESCRIPCIÓN', 50, yPosition);
       doc.text('CANT.', 300, yPosition);
       doc.text('PRECIO', 360, yPosition);
@@ -209,8 +208,6 @@ module.exports = {
         yPosition += 15;
         doc.text('Sin impuestos aplicables', 50, yPosition);
       }
-      yPosition += 15;
-      doc.text(`Fecha de vencimiento: ${conduce.fechaVencimiento ? conduce.fechaVencimiento.toLocaleDateString('es-DO') : ''}`, 50, yPosition);
       yPosition += 15;
       doc.text('Para factura fiscal, solicitar agrupación de conduces al realizar el pago', 50, yPosition);
       doc.fontSize(10).text('Gracias por su preferencia', 50, yPosition + 30);
