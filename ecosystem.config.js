@@ -6,12 +6,12 @@ module.exports = {
     instances: 1,
     env: {
       NODE_ENV: 'production',
-      PORT: 3007,
+  PORT: 3005,
       MONGODB_URI: 'mongodb://127.0.0.1:27017/comedor'
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: 3007
+  PORT: 3005
     },
     error_file: '/var/log/pm2/comedor-app-error.log',
     out_file: '/var/log/pm2/comedor-app-out.log',
