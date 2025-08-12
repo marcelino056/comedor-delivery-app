@@ -106,7 +106,7 @@ app.get('/', (req, res) => {
 });
 
 // ================== INICIAR SERVIDOR Y LOGS ==================
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.PORT || 3007;
 const ENV = process.env.NODE_ENV || 'development';
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/comedor';
 
