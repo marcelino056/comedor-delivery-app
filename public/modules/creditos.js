@@ -295,6 +295,10 @@ async function compartirConduce(conduce) {
 
 // Anular conduce
 async function anularConduce(conduceId) {
+    console.log('[DEBUG] anularConduce llamado para:', conduceId);
+    const apiUrl = `${window.APIModule.API_BASE}/conduces/${conduceId}/anular`;
+    console.log('[DEBUG] API_BASE:', window.APIModule.API_BASE);
+    console.log('[DEBUG] URL de fetch:', apiUrl);
     try {
         // Buscar información del conduce para mostrar en el modal
         const conduces = window.StateModule.state.conduces || [];
@@ -333,12 +337,13 @@ async function anularConduce(conduceId) {
         }
         
         // Mostrar confirmación adicional para operaciones críticas
+        console.log('[DEBUG] Antes de elegantConfirm');
         const confirmarAnulacion = await window.elegantConfirm(
             `¿Confirma que desea anular este conduce?\n\nMotivo: "${motivo.trim()}"`,
             'Confirmar Anulación',
             'Esta acción no se puede deshacer'
         );
-        
+        console.log('[DEBUG] Después de elegantConfirm:', confirmarAnulacion);
         if (!confirmarAnulacion) {
             console.log('[CREDITOS] Anulación cancelada por el usuario');
             return;
@@ -347,13 +352,14 @@ async function anularConduce(conduceId) {
         // Proceder con la anulación
         window.APIModule.showLoading(true, 'Anulando conduce...');
         
-        const response = await fetch(`${window.APIModule.API_BASE}/conduces/${conduceId}/anular`, {
+        const response = await fetch(apiUrl, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ motivo: motivo.trim() })
         });
+        console.log('[DEBUG] Respuesta fetch:', response);
     
         if (!response.ok) {
             const error = await response.json();
@@ -366,15 +372,11 @@ async function anularConduce(conduceId) {
         window.notify.success(`Conduce anulado exitosamente\nMotivo: ${motivo.trim()}`);
         
         // Recargar la lista de créditos
+        console.log('[DEBUG] Antes de loadCreditos');
         await loadCreditos();
-        
-        console.log('[CREDITOS] ✅ Conduce anulado exitosamente:', {
-            conduceId,
-            motivo: motivo.trim(),
-            cliente: clienteNombre
-        });
-        
+        console.log('[DEBUG] Después de loadCreditos');
     } catch (error) {
+        console.error('[DEBUG] Error en anularConduce:', error);
         console.error('[CREDITOS] ❌ Error anulando conduce:', error);
         window.notify.error(`Error al anular conduce: ${error.message}`);
     } finally {

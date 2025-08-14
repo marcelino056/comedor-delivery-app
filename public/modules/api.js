@@ -4,8 +4,9 @@
  */
 
 // Configuración
-const API_BASE = window.location.origin + '/api';
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3007`;
+const API_PORT = 3007;
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:${API_PORT}/api`;
+const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:${API_PORT}`;
 
 // Funciones de utilidad para API
 function formatCurrency(amount) {
