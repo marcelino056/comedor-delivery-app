@@ -209,6 +209,8 @@ module.exports = {
         doc.text('Sin impuestos aplicables', 50, yPosition);
       }
       yPosition += 15;
+      doc.text(`Fecha de vencimiento: ${conduce.fechaVencimiento ? conduce.fechaVencimiento.toLocaleDateString('es-DO') : ''}`, 50, yPosition);
+      yPosition += 15;
       doc.text('Para factura fiscal, solicitar agrupación de conduces al realizar el pago', 50, yPosition);
       doc.fontSize(10).text('Gracias por su preferencia', 50, yPosition + 30);
       doc.end();
@@ -257,6 +259,15 @@ module.exports = {
       res.json(conduce);
     } catch (error) {
       console.error('[CONDUCES][ERROR] al anular:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+  async delete(req, res) {
+    try {
+      const result = await Conduce.findByIdAndDelete(req.params.id);
+      if (!result) return res.status(404).json({ error: 'Conduce no encontrado' });
+      res.json({ success: true });
+    } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }
