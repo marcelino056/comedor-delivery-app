@@ -2781,6 +2781,10 @@ body {
     margin: 1rem 0;
 }
 
+.conduce-checkbox-label {
+    width: 100%;
+}
+
 .total-item {
     display: flex;
     justify-content: space-between;
