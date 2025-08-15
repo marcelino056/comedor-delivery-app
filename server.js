@@ -110,7 +110,7 @@ const PORT = process.env.PORT || 3007;
 const ENV = process.env.NODE_ENV || 'development';
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/comedor';
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('==============================================');
   console.log('🚀 Servidor Express iniciado');
   console.log(`🌎 Entorno: ${ENV}`);
